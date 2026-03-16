@@ -2,9 +2,12 @@ import 'ranui/message';
 import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj } from '../store';
 import { getOnlyOfficeLang, t } from './i18n';
-import { c_oAscFileType2 } from './file-types';
 import type { SaveEvent } from './document-types';
-import { getMimeTypeFromExtension } from './document-utils';
+import { determineSaveFormat } from './save-format';
+import { getEditorCleanupDelay } from './editor-utils';
+import { createEditorConfig } from './editor-config';
+import { createOperationQueue } from './operation-queue';
+import { validateWriteFileData, createMediaUrlKey } from './media-url';
 
 // Import converter function to avoid circular dependency
 let convertBinToDocumentAndDownloadFn:
@@ -21,49 +24,13 @@ export function setConverterCallback(
 const media: Record<string, string> = {};
 
 // Editor operation queue to prevent concurrent operations
-let editorOperationQueue: Promise<void> = Promise.resolve();
-
-/**
- * Queue editor operations to prevent concurrent editor creation/destruction
- */
-async function queueEditorOperation<T>(operation: () => Promise<T>): Promise<T> {
-  // Wait for previous operations to complete
-  // Add a timeout to prevent infinite waiting
-  try {
-    await Promise.race([
-      editorOperationQueue,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Editor operation queue timeout')), 30000)),
-    ]);
-  } catch (error) {
-    // If timeout, log warning but continue (previous operation may have failed)
-    if (error instanceof Error && error.message === 'Editor operation queue timeout') {
-      console.warn('Editor operation queue timeout, proceeding anyway');
-    } else {
-      // Re-throw other errors
-      throw error;
-    }
-  }
-
-  // Create a new promise for this operation
-  let resolveOperation: () => void;
-  let rejectOperation: (error: any) => void;
-  const operationPromise = new Promise<void>((resolve, reject) => {
-    resolveOperation = resolve;
-    rejectOperation = reject;
-  });
-
-  // Update the queue
-  editorOperationQueue = operationPromise;
-
-  try {
-    const result = await operation();
-    resolveOperation!();
-    return result;
-  } catch (error) {
-    rejectOperation!(error);
-    throw error;
-  }
-}
+// Uses the extracted operation queue utility with:
+// - 30 second timeout for waiting on previous operations
+// - Warning log when timeout occurs
+const queueEditorOperation = createOperationQueue({
+  timeout: 30000,
+  onTimeout: () => console.warn('Editor operation queue timeout, proceeding anyway'),
+});
 
 /**
  * Handle file write request (mainly for handling pasted images)
@@ -85,26 +52,19 @@ async function handleWriteFile(event: any) {
       _target, // Target object containing frameOrigin and other info
     } = eventData;
 
-    // Validate data
-    if (!imageData || !(imageData instanceof Uint8Array)) {
-      throw new Error('Invalid image data: expected Uint8Array');
+    // Validate data using extracted helper
+    const validation = validateWriteFileData(imageData, fileName);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
     }
 
-    if (!fileName || typeof fileName !== 'string') {
-      throw new Error('Invalid file name');
-    }
-
-    // Extract extension from file name
-    const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'png';
-    const mimeType = getMimeTypeFromExtension(fileExtension);
-
-    // Create Blob object
-    const blob = new Blob([imageData as unknown as BlobPart], { type: mimeType });
+    // Create Blob object with validated MIME type
+    const blob = new Blob([imageData as unknown as BlobPart], { type: validation.mimeType });
 
     // Create object URL
     const objectUrl = await createObjectURL(blob);
-    // Add image URL to media mapping using original file name as key
-    media[`media/${fileName}`] = objectUrl;
+    // Add image URL to media mapping using extracted key helper
+    media[createMediaUrlKey(fileName)] = objectUrl;
     window.editor?.sendCommand({
       command: 'asc_setImageUrls',
       data: {
@@ -151,20 +111,9 @@ async function handleSaveDocument(event: SaveEvent) {
     const { data, option } = event.data;
     const { fileName } = getDocmentObj() || {};
 
-    // Determine target format from editor's output format
-    let targetFormat = c_oAscFileType2[option.outputformat];
-
-    // Only force CSV format if the original file is CSV
-    // This check ensures XLSX and other file types are not affected
-    // CSV files are converted to XLSX internally, so editor may return XLSX format
-    if (fileName && fileName.toLowerCase().endsWith('.csv')) {
-      targetFormat = 'CSV';
-      console.log('Original file is CSV, forcing save as CSV format');
-    } else {
-      // For non-CSV files (XLSX, DOCX, PPTX, etc.), use the format returned by editor
-      // This ensures XLSX files are saved as XLSX, not CSV
-      console.log(`Saving as ${targetFormat} format (original file: ${fileName})`);
-    }
+    // Determine target format using extracted helper
+    const targetFormat = determineSaveFormat(option.outputformat, fileName);
+    console.log(`Saving as ${targetFormat} format (original file: ${fileName})`);
 
     // Create download
     if (convertBinToDocumentAndDownloadFn) {
@@ -202,9 +151,7 @@ export function createEditorInstance(config: {
 
         // When switching between document types, especially from/to PPT,
         // we need more time for cleanup. PPT editors are particularly resource-intensive.
-        // Use longer delay when switching editors or when dealing with presentations
-        const isPresentation = fileType === 'pptx' || fileType === 'ppt';
-        const destroyDelay = hasExistingEditor && isPresentation ? 400 : hasExistingEditor ? 250 : 150;
+        const destroyDelay = getEditorCleanupDelay(fileType, true);
 
         // Wait a bit for destroy to complete
         await new Promise((resolve) => setTimeout(resolve, destroyDelay));
@@ -225,71 +172,49 @@ export function createEditorInstance(config: {
 
     // Additional delay to ensure cleanup completes before creating new editor
     // This is especially important when switching between different document types
-    // When switching editors, especially involving PPT, we need more time
-    const isPresentation = fileType === 'pptx' || fileType === 'ppt';
-    const cleanupDelay = hasExistingEditor && isPresentation ? 400 : hasExistingEditor ? 250 : 150;
+    const cleanupDelay = getEditorCleanupDelay(fileType, hasExistingEditor);
     await new Promise((resolve) => setTimeout(resolve, cleanupDelay));
 
     const editorLang = getOnlyOfficeLang();
     console.log('Creating new editor instance for:', fileName, 'type:', fileType);
 
-    try {
-      window.editor = new window.DocsAPI.DocEditor('iframe', {
-        document: {
-          title: fileName,
-          url: fileName, // Use file name as identifier
-          fileType: fileType,
-          permissions: {
-            edit: true,
-            chat: false,
-            protect: false,
-          },
-        },
-        editorConfig: {
-          lang: editorLang,
-          customization: {
-            help: false,
-            about: false,
-            hideRightMenu: true,
-            features: {
-              spellcheck: {
-                change: false,
-              },
-            },
-            anonymous: {
-              request: false,
-              label: 'Guest',
-            },
-          },
-        },
-        events: {
-          onAppReady: () => {
-            // Set media resources
-            if (mediaUrls) {
-              window.editor?.sendCommand({
-                command: 'asc_setImageUrls',
-                data: { urls: mediaUrls },
-              });
-            }
+    // Define event handlers
+    const eventHandlers = {
+      onAppReady: () => {
+        // Set media resources
+        if (mediaUrls) {
+          window.editor?.sendCommand({
+            command: 'asc_setImageUrls',
+            data: { urls: mediaUrls },
+          });
+        }
 
-            // Load document content
-            window.editor?.sendCommand({
-              command: 'asc_openDocument',
-              // @ts-expect-error binData type is handled by the editor
-              data: { buf: binData },
-            });
-          },
-          onDocumentReady: () => {
-            console.log(`${t('documentLoaded')}${fileName}`);
-            // Note: For CSV files, the save dialog may show XLSX format,
-            // but the actual save will be forced to CSV format in handleSaveDocument
-          },
-          onSave: handleSaveDocument,
-          // writeFile
-          // TODO: writeFile - handle when pasting images from external sources
-          writeFile: handleWriteFile,
-        },
-      });
+        // Load document content
+        window.editor?.sendCommand({
+          command: 'asc_openDocument',
+          // @ts-expect-error binData type is handled by the editor
+          data: { buf: binData },
+        });
+      },
+      onDocumentReady: () => {
+        console.log(`${t('documentLoaded')}${fileName}`);
+        // Note: For CSV files, the save dialog may show XLSX format,
+        // but the actual save will be forced to CSV format in handleSaveDocument
+      },
+      onSave: handleSaveDocument,
+      writeFile: handleWriteFile,
+    };
+
+    // Create editor configuration using extracted helper
+    const editorConfig = createEditorConfig({
+      fileName,
+      fileType,
+      lang: editorLang,
+      events: eventHandlers,
+    });
+
+    try {
+      window.editor = new window.DocsAPI.DocEditor('iframe', editorConfig);
     } catch (error) {
       console.error('Error creating editor instance:', error);
       throw error;

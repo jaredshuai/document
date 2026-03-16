@@ -1,86 +1,11 @@
 import { getCookie, getQuery, localStorageGetItem, localStorageSetItem } from 'ranuts/utils';
+import { normalizeLanguage as normalizeLangCode } from './url-utils';
+import { LanguageCode, OnlyOfficeLanguageCode, type Language, toOnlyOfficeLang } from './language-types';
+import { i18nMessages, type I18nMessages } from './i18n-messages';
 
-/**
- * Internationalization configuration
- */
-
-/**
- * Language codes enum
- * Internal language codes (simplified): 'zh' | 'en'
- * OnlyOffice language codes (BCP 47 standard): 'zh-CN' | 'en'
- */
-export enum LanguageCode {
-  /** Simplified Chinese (internal) */
-  ZH = 'zh',
-  /** English (internal) */
-  EN = 'en',
-}
-
-/**
- * OnlyOffice language codes (BCP 47 standard)
- */
-export enum OnlyOfficeLanguageCode {
-  /** Simplified Chinese (Mainland China) - BCP 47 standard */
-  ZH_CN = 'zh-CN',
-  /** English */
-  EN = 'en',
-}
-
-export type Language = LanguageCode.ZH | LanguageCode.EN;
-
-export interface I18nMessages {
-  // UI text
-  webOffice: string;
-  uploadDocument: string;
-  newWord: string;
-  newExcel: string;
-  newPowerPoint: string;
-  menu: string;
-  menuGuide: string;
-
-  // Messages
-  fileSavedSuccess: string;
-  documentLoaded: string;
-
-  // Error messages
-  failedToLoadEditor: string;
-  unsupportedFileType: string;
-  invalidFileObject: string;
-  documentOperationFailed: string;
-}
-
-const messages: Record<Language, I18nMessages> = {
-  [LanguageCode.ZH]: {
-    webOffice: 'Web Office',
-    uploadDocument: '查看/编辑文档',
-    newWord: '新建 Word',
-    newExcel: '新建 Excel',
-    newPowerPoint: '新建 PowerPoint',
-    menu: '菜单',
-    menuGuide: '菜单在右下角，悬停即可查看（点击关闭后不再提示）',
-    fileSavedSuccess: '文件保存成功：',
-    documentLoaded: '文档加载完成：',
-    failedToLoadEditor: '无法加载编辑器组件。请确保已正确安装 OnlyOffice API。',
-    unsupportedFileType: '不支持的文件类型：',
-    invalidFileObject: '无效的文件对象',
-    documentOperationFailed: '文档操作失败：',
-  },
-  [LanguageCode.EN]: {
-    webOffice: 'Web Office',
-    uploadDocument: 'View/Edit Document',
-    newWord: 'New Word',
-    newExcel: 'New Excel',
-    newPowerPoint: 'New PowerPoint',
-    menu: 'Menu',
-    menuGuide: "Menu is in the bottom right corner, hover to view (click to close, won't show again)",
-    fileSavedSuccess: 'File saved successfully: ',
-    documentLoaded: 'Document loaded: ',
-    failedToLoadEditor: 'Failed to load editor component. Please ensure OnlyOffice API is properly installed.',
-    unsupportedFileType: 'Unsupported file type: ',
-    invalidFileObject: 'Invalid file object',
-    documentOperationFailed: 'Document operation failed: ',
-  },
-};
+// Re-export for backward compatibility
+export { LanguageCode, OnlyOfficeLanguageCode, type Language } from './language-types';
+export type { I18nMessages } from './i18n-messages';
 
 class I18n {
   private currentLanguage: Language = LanguageCode.EN;
@@ -104,8 +29,7 @@ class I18n {
    * Supports: 'zh', 'zh-CN', 'zh_CN', 'en', 'en-US', etc.
    */
   private normalizeLanguage(lang: string | null): Language | null {
-    if (!lang) return null;
-    const normalized = lang.toLowerCase().split(/[-_]/)[0];
+    const normalized = normalizeLangCode(lang);
     if (normalized === 'zh') return LanguageCode.ZH;
     if (normalized === 'en') return LanguageCode.EN;
     return null;
@@ -172,14 +96,14 @@ class I18n {
    * Get translated text
    */
   t(key: keyof I18nMessages): string {
-    return messages[this.currentLanguage][key] || messages[LanguageCode.EN][key] || key;
+    return i18nMessages[this.currentLanguage][key] || i18nMessages[LanguageCode.EN][key] || key;
   }
 
   /**
    * Get all messages
    */
   getMessages(): I18nMessages {
-    return messages[this.currentLanguage];
+    return i18nMessages[this.currentLanguage];
   }
 
   /**
@@ -189,12 +113,7 @@ class I18n {
    * - Simplified Chinese (Mainland China): 'zh-CN'
    */
   getOnlyOfficeLang(): string {
-    // Mapping from internal language code to OnlyOffice BCP 47 standard code
-    const langMap: Record<Language, OnlyOfficeLanguageCode> = {
-      [LanguageCode.ZH]: OnlyOfficeLanguageCode.ZH_CN,
-      [LanguageCode.EN]: OnlyOfficeLanguageCode.EN,
-    };
-    return langMap[this.currentLanguage] || OnlyOfficeLanguageCode.EN;
+    return toOnlyOfficeLang(this.currentLanguage);
   }
 }
 

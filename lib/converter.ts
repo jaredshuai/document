@@ -1,9 +1,9 @@
-import { getExtensions } from 'ranuts/utils';
-import { g_sEmpty_bin } from './empty_bin';
+import { requireNewDocumentTemplate } from './document-template';
 import { t } from './i18n';
 import { X2TConverter } from './document-converter';
 import { createEditorInstance, loadEditorApi, setConverterCallback } from './onlyoffice-editor';
 import { getDocumentType } from './document-utils';
+import { extractFileType } from './url-utils';
 import type { BinConversionResult, ConversionResult, EmscriptenModule } from './document-types';
 
 // Export types
@@ -48,7 +48,7 @@ export async function handleDocumentOperation(options: {
 }): Promise<void> {
   try {
     const { isNew, fileName, file } = options;
-    const fileType = getExtensions(file?.type || '')[0] || fileName.split('.').pop() || '';
+    const fileType = extractFileType(file?.type, fileName);
     const _docType = getDocumentType(fileType);
 
     // Get document content
@@ -59,11 +59,12 @@ export async function handleDocumentOperation(options: {
 
     if (isNew) {
       // New document uses empty template
-      const emptyBin = g_sEmpty_bin[`.${fileType}`];
-      if (!emptyBin) {
+      try {
+        const emptyBin = requireNewDocumentTemplate(fileType);
+        documentData = { bin: emptyBin };
+      } catch {
         throw new Error(`${t('unsupportedFileType')}${fileType}`);
       }
-      documentData = { bin: emptyBin };
     } else {
       // Opening existing document requires conversion
       if (!file) throw new Error(t('invalidFileObject'));

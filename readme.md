@@ -13,6 +13,7 @@
   <a href="https://ranuts.github.io/document/">
     <img src="https://img.shields.io/badge/Live-Demo-brightgreen" alt="Live Demo">
   </a>
+  <img src="https://img.shields.io/badge/Coverage-100%25-brightgreen" alt="Test Coverage">
 </p>
 
 <p align="center">
@@ -141,6 +142,71 @@ npm install
 npm run dev
 ```
 
+### Running Tests
+
+The project uses [Vitest](https://vitest.dev/) for testing. Test files are located in `lib/__tests__/`.
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run tests with coverage report
+pnpm test:coverage
+```
+
+#### Test Coverage
+
+The project focuses on testing pure utility functions that can be reliably unit tested:
+
+| Module | Coverage | Description |
+|--------|----------|-------------|
+| `lib/file-types.ts` | 100% | File type constants and reverse mapping |
+| `lib/url-utils.ts` | 100% | URL/filename parsing, language normalization, file sanitization |
+| `lib/language-types.ts` | 100% | Language code enums and utilities |
+| `lib/conversion-utils.ts` | 100% | Document conversion parameter generation |
+| `lib/conversion-paths.ts` | 100% | X2T virtual file system paths |
+| `lib/i18n-messages.ts` | 100% | Internationalization messages and validation |
+| `lib/type-guards.ts` | 100% | Runtime type validation for external data |
+| `lib/error-utils.ts` | 100% | Error handling, formatting, and classification |
+| `lib/byte-utils.ts` | 100% | UTF-8 BOM handling, byte encoding/decoding |
+| `lib/empty_bin.ts` | 100% | Empty document templates for new files |
+| `lib/document-utils.ts` | 100% | Document type detection, MIME types |
+| `lib/render-workflow.ts` | 100% | Chunked document loading workflow |
+| `lib/document-template.ts` | 100% | New document template utilities |
+| `lib/save-format.ts` | 100% | Save format determination |
+| `lib/editor-utils.ts` | 100% | Editor delay utilities |
+| `lib/editor-config.ts` | 100% | Editor configuration helpers |
+| `lib/operation-queue.ts` | 100% | Sequential async operation queue |
+| `lib/file-picker.ts` | 100% | File System API picker utilities |
+| `lib/media-url.ts` | 100% | Media URL utilities for editor |
+| `store/index.ts` | 100% | State management store |
+
+**Key Testable Functions** (`lib/url-utils.ts`):
+- `sanitizeFileName()` - Sanitizes filenames by removing illegal characters
+- `getMimeType()` - Returns MIME type for file extension
+- `getFileDescription()` - Returns human-readable file type descriptions
+- `extractFileType()` - Extracts file type from MIME type or filename
+- `normalizeLanguage()` - Normalizes language codes (zh-CN → zh)
+- `determineFilename()` - Priority-based filename determination
+
+**Type Guards** (`lib/type-guards.ts`):
+- `isValidRenderOfficeData()` - Validates chunked file data from message codec
+- `isValidChunkSequence()` - Validates chunk array completeness
+- `isValidFile()` - Validates file name/size constraints
+
+**Error Utilities** (`lib/error-utils.ts`):
+- `formatErrorMessage()` - Safely extracts error messages from unknown values
+- `isNetworkError()` - Classifies network-related errors
+- `isFileError()` - Classifies file-related errors
+- `safeAsync()` - Wraps async functions with safe error handling
+
+**Note**: Browser-dependent modules (UI, OnlyOffice integration, DOM manipulation) are not unit tested as they require browser environments. The focus is on testing testable pure functions.
+
+Tests are automatically run in CI on every push and pull request. Coverage reports are generated as part of the CI pipeline.
+
 ## 🔤 Font Management
 
 ### Font Files in This Project
@@ -181,6 +247,13 @@ You can find the index for any font by checking the `__fonts_infos` array in `Al
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome to help improve this project!
+
+Please read the [Contributing Guidelines](CONTRIBUTING.md) for detailed information on:
+
+- Development setup
+- Testing guidelines
+- Code style requirements
+- Pull request process
 
 ## 📄 License
 

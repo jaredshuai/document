@@ -8,6 +8,7 @@ import {
   showControlPanel,
   showMenuGuide,
 } from './lib/ui';
+import { extractDocumentUrl, safeDecodeUri } from './lib/url-utils';
 import 'ranui/button';
 import '@khmyznikov/pwa-install';
 import './styles/base.css';
@@ -58,18 +59,10 @@ createControlPanel();
 //   ?src=https://example.com/doc.docx
 //   ?file=doc1.docx&src=doc2.xlsx (will use file: doc1.docx)
 const { file, src } = getAllQueryString();
-const documentUrl = file || src;
+const documentUrl = extractDocumentUrl({ file, src });
 if (documentUrl) {
-  // Decode URL if it's encoded
-  try {
-    const decodedUrl = decodeURIComponent(documentUrl);
-    // Open document from URL
-    openDocumentFromUrl(decodedUrl);
-  } catch (error) {
-    // If decoding fails, try using original URL
-    console.warn('Failed to decode URL, using original:', error);
-    openDocumentFromUrl(documentUrl);
-  }
+  const decodedUrl = safeDecodeUri(documentUrl);
+  openDocumentFromUrl(decodedUrl);
 }
 
 // Register Service Worker for PWA

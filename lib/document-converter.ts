@@ -2,7 +2,18 @@ import { createObjectURL, getExtensions, scriptOnLoad } from 'ranuts/utils';
 import 'ranui/message';
 import { t } from './i18n';
 import type { BinConversionResult, ConversionResult, DocumentType, EmscriptenModule } from './document-types';
-import { BASE_PATH, DOCUMENT_TYPE_MAP } from './document-utils';
+import { BASE_PATH, getDocumentType } from './document-utils';
+import { sanitizeFileName } from './url-utils';
+import { createConversionParams } from './conversion-utils';
+import { hasUtf8Bom, decodeBytes, concatBytes, UTF8_BOM, encodeToBytes } from './byte-utils';
+import { createSavePickerOptions } from './file-picker';
+import {
+  WORKING_DIRS,
+  createConversionPaths,
+  getParamsPath,
+  getWorkingPath,
+  createOutputFileName,
+} from './conversion-paths';
 
 export class X2TConverter {
   private x2tModule: EmscriptenModule | null = null;
@@ -10,10 +21,6 @@ export class X2TConverter {
   private initPromise: Promise<EmscriptenModule> | null = null;
   private hasScriptLoaded = false;
 
-  // Supported file type mapping
-  private readonly DOCUMENT_TYPE_MAP: Record<string, DocumentType> = DOCUMENT_TYPE_MAP;
-
-  private readonly WORKING_DIRS = ['/working', '/working/media', '/working/fonts', '/working/themes'];
   private readonly SCRIPT_PATH = `${BASE_PATH}wasm/x2t/x2t.js`;
   private readonly INIT_TIMEOUT = 300000;
 
@@ -92,7 +99,7 @@ export class X2TConverter {
    * Create working directories
    */
   private createWorkingDirectories(x2t: EmscriptenModule): void {
-    this.WORKING_DIRS.forEach((dir) => {
+    WORKING_DIRS.forEach((dir) => {
       try {
         x2t.FS.mkdir(dir);
       } catch (error) {
@@ -100,45 +107,6 @@ export class X2TConverter {
         console.warn(`Directory ${dir} may already exist:`, error);
       }
     });
-  }
-
-  /**
-   * Get document type
-   */
-  private getDocumentType(extension: string): DocumentType {
-    const docType = DOCUMENT_TYPE_MAP[extension.toLowerCase()];
-    if (!docType) {
-      throw new Error(`Unsupported file format: ${extension}`);
-    }
-    return docType;
-  }
-
-  /**
-   * Sanitize file name
-   */
-  private sanitizeFileName(input: string): string {
-    if (typeof input !== 'string' || !input.trim()) {
-      return 'file.bin';
-    }
-
-    const parts = input.split('.');
-    const ext = parts.pop() || 'bin';
-    const name = parts.join('.');
-
-    const illegalChars = /[/?<>\\:*|"]/g;
-    // eslint-disable-next-line no-control-regex
-    const controlChars = /[\x00-\x1f\x80-\x9f]/g;
-    const reservedPattern = /^\.+$/;
-    const unsafeChars = /[&'%!"{}[\]]/g;
-
-    let sanitized = name
-      .replace(illegalChars, '')
-      .replace(controlChars, '')
-      .replace(reservedPattern, '')
-      .replace(unsafeChars, '');
-
-    sanitized = sanitized.trim() || 'file';
-    return `${sanitized.slice(0, 200)}.${ext}`; // Limit length
   }
 
   /**
@@ -167,20 +135,6 @@ export class X2TConverter {
       }
       throw new Error(`Conversion failed with code: ${result}`);
     }
-  }
-
-  /**
-   * Create conversion parameters XML
-   */
-  private createConversionParams(fromPath: string, toPath: string, additionalParams = ''): string {
-    return `<?xml version="1.0" encoding="utf-8"?>
-<TaskQueueDataConvert xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <m_sFileFrom>${fromPath}</m_sFileFrom>
-  <m_sThemeDir>/working/themes</m_sThemeDir>
-  <m_sFileTo>${toPath}</m_sFileTo>
-  <m_bIsNoBase64>false</m_bIsNoBase64>
-  ${additionalParams}
-</TaskQueueDataConvert>`;
   }
 
   /**
@@ -260,18 +214,8 @@ export class X2TConverter {
       // Load xlsx library
       const XLSX = await this.loadXlsxLibrary();
 
-      // Remove UTF-8 BOM if present
-      let csvText: string;
-      if (csvData.length >= 3 && csvData[0] === 0xef && csvData[1] === 0xbb && csvData[2] === 0xbf) {
-        csvText = new TextDecoder('utf-8').decode(csvData.slice(3));
-      } else {
-        // Try UTF-8 first, fallback to other encodings if needed
-        try {
-          csvText = new TextDecoder('utf-8').decode(csvData);
-        } catch {
-          csvText = new TextDecoder('latin1').decode(csvData);
-        }
-      }
+      // Decode CSV data, handling UTF-8 BOM if present
+      const csvText = decodeBytes(csvData);
 
       // Parse CSV using SheetJS
       const workbook = XLSX.read(csvText, { type: 'string', raw: false });
@@ -300,7 +244,10 @@ export class X2TConverter {
 
     const fileName = file.name;
     const fileExt = getExtensions(file?.type)[0] || fileName.split('.').pop() || '';
-    const documentType = this.getDocumentType(fileExt);
+    const documentType = getDocumentType(fileExt);
+    if (!documentType) {
+      throw new Error(`Unsupported file format: ${fileExt}`);
+    }
 
     try {
       // Read file content
@@ -325,19 +272,18 @@ export class X2TConverter {
           const xlsxData = new Uint8Array(xlsxArrayBuffer);
 
           // Use the XLSX file for conversion
-          const sanitizedName = this.sanitizeFileName(xlsxFile.name);
-          const inputPath = `/working/${sanitizedName}`;
-          const outputPath = `${inputPath}.bin`;
+          const sanitizedName = sanitizeFileName(xlsxFile.name);
+          const { inputPath, outputPath } = createConversionPaths(sanitizedName);
 
           // Write XLSX file to virtual file system
           this.x2tModule!.FS.writeFile(inputPath, xlsxData);
 
           // Create conversion parameters - no special params needed for XLSX
-          const params = this.createConversionParams(inputPath, outputPath, '');
-          this.x2tModule!.FS.writeFile('/working/params.xml', params);
+          const params = createConversionParams(inputPath, outputPath, '');
+          this.x2tModule!.FS.writeFile(getParamsPath(), params);
 
           // Execute conversion
-          this.executeConversion('/working/params.xml');
+          this.executeConversion(getParamsPath());
 
           // Read conversion result
           const result = this.x2tModule!.FS.readFile(outputPath);
@@ -345,7 +291,7 @@ export class X2TConverter {
 
           // Return original CSV fileName, not the XLSX one
           return {
-            fileName: this.sanitizeFileName(fileName), // Keep original CSV filename
+            fileName: sanitizeFileName(fileName), // Keep original CSV filename
             type: documentType,
             bin: result,
             media,
@@ -360,19 +306,18 @@ export class X2TConverter {
       }
 
       // For all other file types, use standard conversion
-      const sanitizedName = this.sanitizeFileName(fileName);
-      const inputPath = `/working/${sanitizedName}`;
-      const outputPath = `${inputPath}.bin`;
+      const sanitizedName = sanitizeFileName(fileName);
+      const { inputPath, outputPath } = createConversionPaths(sanitizedName);
 
       // Write file to virtual file system
       this.x2tModule!.FS.writeFile(inputPath, data);
 
       // Create conversion parameters - no special params needed for non-CSV files
-      const params = this.createConversionParams(inputPath, outputPath, '');
-      this.x2tModule!.FS.writeFile('/working/params.xml', params);
+      const params = createConversionParams(inputPath, outputPath, '');
+      this.x2tModule!.FS.writeFile(getParamsPath(), params);
 
       // Execute conversion
-      this.executeConversion('/working/params.xml');
+      this.executeConversion(getParamsPath());
 
       // Read conversion result
       const result = this.x2tModule!.FS.readFile(outputPath);
@@ -398,30 +343,22 @@ export class X2TConverter {
     fileName: string,
     documentType: DocumentType,
   ): Promise<ConversionResult> {
-    // Handle UTF-8 BOM
-    let fileData = data;
-    const hasBOM = data.length >= 3 && data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf;
-    if (!hasBOM) {
-      const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
-      fileData = new Uint8Array(bom.length + data.length);
-      fileData.set(bom, 0);
-      fileData.set(data, bom.length);
-    }
+    // Ensure UTF-8 BOM is present for CSV files
+    const fileData = hasUtf8Bom(data) ? data : concatBytes(UTF8_BOM, data);
 
-    const sanitizedName = this.sanitizeFileName(fileName);
-    const inputPath = `/working/${sanitizedName}`;
-    const outputPath = `${inputPath}.bin`;
+    const sanitizedName = sanitizeFileName(fileName);
+    const { inputPath, outputPath } = createConversionPaths(sanitizedName);
 
     // Write file to virtual file system
     this.x2tModule!.FS.writeFile(inputPath, fileData);
 
     // Try with format specification
     const additionalParams = '<m_nFormatFrom>260</m_nFormatFrom>';
-    const params = this.createConversionParams(inputPath, outputPath, additionalParams);
-    this.x2tModule!.FS.writeFile('/working/params.xml', params);
+    const params = createConversionParams(inputPath, outputPath, additionalParams);
+    this.x2tModule!.FS.writeFile(getParamsPath(), params);
 
     // Execute conversion - this will likely fail with error 89
-    this.executeConversion('/working/params.xml');
+    this.executeConversion(getParamsPath());
 
     // If we get here, conversion succeeded (unlikely for CSV)
     const result = this.x2tModule!.FS.readFile(outputPath);
@@ -445,24 +382,24 @@ export class X2TConverter {
   ): Promise<BinConversionResult> {
     await this.initialize();
 
-    const sanitizedBase = this.sanitizeFileName(originalFileName).replace(/\.[^/.]+$/, '');
+    const sanitizedBase = sanitizeFileName(originalFileName).replace(/\.[^/.]+$/, '');
     const binFileName = `${sanitizedBase}.bin`;
-    const outputFileName = `${sanitizedBase}.${targetExt.toLowerCase()}`;
+    const outputFileName = createOutputFileName(sanitizedBase, targetExt);
 
     try {
       // Handle CSV files specially - need to convert bin -> XLSX -> CSV
       if (targetExt.toUpperCase() === 'CSV') {
         // First convert bin to XLSX
         const xlsxFileName = `${sanitizedBase}.xlsx`;
-        this.x2tModule!.FS.writeFile(`/working/${binFileName}`, bin);
+        this.x2tModule!.FS.writeFile(getWorkingPath(binFileName), bin);
 
-        const params = this.createConversionParams(`/working/${binFileName}`, `/working/${xlsxFileName}`, '');
+        const params = createConversionParams(getWorkingPath(binFileName), getWorkingPath(xlsxFileName), '');
 
-        this.x2tModule!.FS.writeFile('/working/params.xml', params);
-        this.executeConversion('/working/params.xml');
+        this.x2tModule!.FS.writeFile(getParamsPath(), params);
+        this.executeConversion(getParamsPath());
 
         // Read XLSX file
-        const xlsxResult = this.x2tModule!.FS.readFile(`/working/${xlsxFileName}`);
+        const xlsxResult = this.x2tModule!.FS.readFile(getWorkingPath(xlsxFileName));
         const xlsxArray = xlsxResult instanceof Uint8Array ? xlsxResult : new Uint8Array(xlsxResult as ArrayBuffer);
 
         // Convert XLSX to CSV using SheetJS
@@ -476,25 +413,21 @@ export class X2TConverter {
         // Convert to CSV
         const csvText = XLSX.utils.sheet_to_csv(worksheet);
 
-        // Convert CSV text to Uint8Array (UTF-8 with BOM for better compatibility)
-        const csvBOM = new Uint8Array([0xef, 0xbb, 0xbf]);
-        const csvTextBytes = new TextEncoder().encode(csvText);
-        const csvArray = new Uint8Array(csvBOM.length + csvTextBytes.length);
-        csvArray.set(csvBOM, 0);
-        csvArray.set(csvTextBytes, csvBOM.length);
+        // Convert CSV text to UTF-8 bytes with BOM for better compatibility
+        const csvArray = encodeToBytes(csvText, true);
 
         // Save CSV file
         await this.saveWithFileSystemAPI(csvArray, outputFileName);
 
         return {
           fileName: outputFileName,
-          data: csvArray,
+          data: csvArray as BlobPart,
         };
       }
 
       // For all other file types, use standard conversion
       // Write bin file
-      this.x2tModule!.FS.writeFile(`/working/${binFileName}`, bin);
+      this.x2tModule!.FS.writeFile(getWorkingPath(binFileName), bin);
 
       // Create conversion parameters
       let additionalParams = '';
@@ -502,19 +435,19 @@ export class X2TConverter {
         additionalParams = '<m_sFontDir>/working/fonts/</m_sFontDir>';
       }
 
-      const params = this.createConversionParams(
-        `/working/${binFileName}`,
-        `/working/${outputFileName}`,
+      const params = createConversionParams(
+        getWorkingPath(binFileName),
+        getWorkingPath(outputFileName),
         additionalParams,
       );
 
-      this.x2tModule!.FS.writeFile('/working/params.xml', params);
+      this.x2tModule!.FS.writeFile(getParamsPath(), params);
 
       // Execute conversion
-      this.executeConversion('/working/params.xml');
+      this.executeConversion(getParamsPath());
 
       // Read generated document
-      const result = this.x2tModule!.FS.readFile(`/working/${outputFileName}`);
+      const result = this.x2tModule!.FS.readFile(getWorkingPath(outputFileName));
 
       // Ensure result is Uint8Array type
       const resultArray = result instanceof Uint8Array ? result : new Uint8Array(result as ArrayBuffer);
@@ -555,66 +488,6 @@ export class X2TConverter {
   }
 
   /**
-   * Get MIME type from file extension
-   */
-  private getMimeTypeFromExtension(extension: string): string {
-    const mimeMap: Record<string, string> = {
-      // Document types
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      doc: 'application/msword',
-      odt: 'application/vnd.oasis.opendocument.text',
-      rtf: 'application/rtf',
-      txt: 'text/plain',
-      pdf: 'application/pdf',
-
-      // Spreadsheet types
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      xls: 'application/vnd.ms-excel',
-      ods: 'application/vnd.oasis.opendocument.spreadsheet',
-      csv: 'text/csv',
-
-      // Presentation types
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      ppt: 'application/vnd.ms-powerpoint',
-      odp: 'application/vnd.oasis.opendocument.presentation',
-
-      // Image types
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      gif: 'image/gif',
-      bmp: 'image/bmp',
-      webp: 'image/webp',
-      svg: 'image/svg+xml',
-    };
-
-    return mimeMap[extension.toLowerCase()] || 'application/octet-stream';
-  }
-
-  /**
-   * Get file type description
-   */
-  private getFileDescription(extension: string): string {
-    const descriptionMap: Record<string, string> = {
-      docx: 'Word Document',
-      doc: 'Word 97-2003 Document',
-      odt: 'OpenDocument Text',
-      pdf: 'PDF Document',
-      xlsx: 'Excel Workbook',
-      xls: 'Excel 97-2003 Workbook',
-      ods: 'OpenDocument Spreadsheet',
-      pptx: 'PowerPoint Presentation',
-      ppt: 'PowerPoint 97-2003 Presentation',
-      odp: 'OpenDocument Presentation',
-      txt: 'Text Document',
-      rtf: 'Rich Text Format',
-      csv: 'CSV File',
-    };
-
-    return descriptionMap[extension.toLowerCase()] || 'Document';
-  }
-
-  /**
    * Save file using modern File System API
    */
   private async saveWithFileSystemAPI(data: Uint8Array, fileName: string, mimeType?: string): Promise<void> {
@@ -623,22 +496,11 @@ export class X2TConverter {
       return;
     }
     try {
-      // Get file extension and determine MIME type
-      const extension = fileName.split('.').pop()?.toLowerCase() || '';
-      const detectedMimeType = mimeType || this.getMimeTypeFromExtension(extension);
+      // Create file picker options using extracted helper
+      const pickerOptions = createSavePickerOptions(fileName, mimeType);
 
       // Show file save dialog
-      const fileHandle = await (window as any).showSaveFilePicker({
-        suggestedName: fileName,
-        types: [
-          {
-            description: this.getFileDescription(extension),
-            accept: {
-              [detectedMimeType]: [`.${extension}`],
-            },
-          },
-        ],
-      });
+      const fileHandle = await (window as any).showSaveFilePicker(pickerOptions);
 
       // Create writable stream and write data
       const writable = await fileHandle.createWritable();

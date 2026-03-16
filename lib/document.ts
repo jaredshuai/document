@@ -2,6 +2,9 @@ import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
 import { handleDocumentOperation, initX2T, loadEditorApi, loadScript } from './converter';
 import { showLoading } from './loading';
+import { determineFilename } from './url-utils';
+import { formatErrorMessage } from './error-utils';
+import { getFileInputAccept } from './file-picker';
 
 // Import UI functions with type-only to avoid circular dependency
 // These will be passed as callbacks or called after document operations
@@ -22,7 +25,7 @@ export function setUICallbacks(callbacks: {
 // Create a single file input element
 const fileInput = document.createElement('input');
 fileInput.type = 'file';
-fileInput.accept = '.docx,.xlsx,.pptx,.doc,.xls,.ppt,.csv';
+fileInput.accept = getFileInputAccept();
 fileInput.style.setProperty('visibility', 'hidden');
 document.body.appendChild(fileInput);
 
@@ -133,30 +136,12 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     }
 
     // Get file name from URL or Content-Disposition header, or use provided name
-    let finalFileName = fileName;
-    if (!finalFileName) {
-      // Try to get filename from Content-Disposition header
-      const contentDisposition = response.headers.get('Content-Disposition');
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          finalFileName = filenameMatch[1].replace(/['"]/g, '');
-        }
-      }
-
-      // If still no filename, extract from URL
-      if (!finalFileName) {
-        try {
-          const urlObj = new URL(url);
-          const pathname = urlObj.pathname;
-          finalFileName = pathname.split('/').pop() || 'document';
-          // Remove query parameters if any
-          finalFileName = finalFileName.split('?')[0];
-        } catch {
-          finalFileName = 'document';
-        }
-      }
-    }
+    const contentDisposition = response.headers.get('Content-Disposition');
+    const finalFileName = determineFilename({
+      fileName,
+      contentDisposition,
+      url,
+    });
 
     // Get file blob
     const blob = await response.blob();
@@ -182,7 +167,7 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     }
   } catch (error) {
     console.error('Error opening document from URL:', error);
-    alert(`Failed to open document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    alert(`Failed to open document: ${formatErrorMessage(error)}`);
     if (showControlPanelFn) {
       showControlPanelFn();
     }

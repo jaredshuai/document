@@ -1,4 +1,10 @@
-// File type constants
+/**
+ * File type constants for OnlyOffice document formats.
+ * These numeric codes are used internally by the OnlyOffice SDK
+ * to identify different document, spreadsheet, and presentation formats.
+ *
+ * @see https://api.onlyoffice.com/editor/basic
+ */
 export const oAscFileType = {
   UNKNOWN: 0,
   PDF: 513,
@@ -69,6 +75,16 @@ export const oAscFileType = {
   ICO: 1037,
 } as const;
 
+/**
+ * Reverse mapping from numeric file type codes to string names.
+ * Used to look up the file type name from its numeric code.
+ *
+ * @example
+ * ```ts
+ * c_oAscFileType2[65]; // Returns 'DOCX'
+ * c_oAscFileType2[257]; // Returns 'XLSX'
+ * ```
+ */
 export const c_oAscFileType2 = Object.fromEntries(
   Object.entries(oAscFileType).map(([key, value]) => [value, key]),
 ) as Record<number, keyof typeof oAscFileType>;

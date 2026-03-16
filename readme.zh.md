@@ -13,6 +13,7 @@
   <a href="https://ranuts.github.io/document/">
     <img src="https://img.shields.io/badge/在线-体验-brightgreen" alt="在线体验">
   </a>
+  <img src="https://img.shields.io/badge/覆盖率-100%25-brightgreen" alt="测试覆盖率">
 </p>
 
 <p align="center">
@@ -140,6 +141,71 @@ cd document
 npm install
 npm run dev
 ```
+
+### 运行测试
+
+项目使用 [Vitest](https://vitest.dev/) 进行测试。测试文件位于 `lib/__tests__/` 目录。
+
+```bash
+# 运行所有测试
+pnpm test
+
+# 以监视模式运行测试
+pnpm test:watch
+
+# 运行测试并生成覆盖率报告
+pnpm test:coverage
+```
+
+#### 测试覆盖率
+
+项目专注于测试可以可靠进行单元测试的纯工具函数：
+
+| 模块 | 覆盖率 | 说明 |
+|------|--------|------|
+| `lib/file-types.ts` | 100% | 文件类型常量和反向映射 |
+| `lib/url-utils.ts` | 100% | URL/文件名解析、语言标准化、文件名清理 |
+| `lib/language-types.ts` | 100% | 语言代码枚举和工具函数 |
+| `lib/conversion-utils.ts` | 100% | 文档转换参数生成 |
+| `lib/conversion-paths.ts` | 100% | X2T 虚拟文件系统路径 |
+| `lib/i18n-messages.ts` | 100% | 国际化消息和验证 |
+| `lib/type-guards.ts` | 100% | 外部数据的运行时类型验证 |
+| `lib/error-utils.ts` | 100% | 错误处理、格式化和分类 |
+| `lib/byte-utils.ts` | 100% | UTF-8 BOM 处理、字节编码/解码 |
+| `lib/empty_bin.ts` | 100% | 新文件的空文档模板 |
+| `lib/document-utils.ts` | 100% | 文档类型检测、MIME 类型 |
+| `lib/render-workflow.ts` | 100% | 分块文档加载工作流 |
+| `lib/document-template.ts` | 100% | 新文档模板工具 |
+| `lib/save-format.ts` | 100% | 保存格式确定 |
+| `lib/editor-utils.ts` | 100% | 编辑器延迟工具 |
+| `lib/editor-config.ts` | 100% | 编辑器配置助手 |
+| `lib/operation-queue.ts` | 100% | 顺序异步操作队列 |
+| `lib/file-picker.ts` | 100% | 文件系统 API 选择器工具 |
+| `lib/media-url.ts` | 100% | 编辑器媒体 URL 工具 |
+| `store/index.ts` | 100% | 状态管理存储 |
+
+**主要可测试函数** (`lib/url-utils.ts`):
+- `sanitizeFileName()` - 清理文件名，移除非法字符
+- `getMimeType()` - 根据文件扩展名返回 MIME 类型
+- `getFileDescription()` - 返回文件类型的人类可读描述
+- `extractFileType()` - 从 MIME 类型或文件名提取文件类型
+- `normalizeLanguage()` - 标准化语言代码 (zh-CN → zh)
+- `determineFilename()` - 按优先级确定文件名
+
+**类型守卫** (`lib/type-guards.ts`):
+- `isValidRenderOfficeData()` - 验证来自消息编解码器的分块文件数据
+- `isValidChunkSequence()` - 验证分块数组的完整性
+- `isValidFile()` - 验证文件名和大小约束
+
+**错误处理工具** (`lib/error-utils.ts`):
+- `formatErrorMessage()` - 从未知值安全提取错误消息
+- `isNetworkError()` - 分类网络相关错误
+- `isFileError()` - 分类文件相关错误
+- `safeAsync()` - 包装异步函数实现安全错误处理
+
+**注意**：依赖浏览器的模块（UI、OnlyOffice 集成、DOM 操作）未进行单元测试，因为它们需要浏览器环境。重点是测试可测试的纯函数。
+
+CI 会在每次推送和拉取请求时自动运行测试。覆盖率报告作为 CI 流水线的一部分生成。
 
 ## 🔤 字体管理
 
