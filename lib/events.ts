@@ -1,7 +1,6 @@
 import { MessageCodec, Platform, createObjectURL } from 'ranuts/utils';
 import type { MessageHandler } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
-import { handleDocumentOperation, initX2T } from './converter';
 import { showLoading } from './loading';
 import { updateRenderChunkState } from './render-workflow';
 import { isValidRenderOfficeData } from './type-guards';
@@ -9,6 +8,18 @@ import { isValidRenderOfficeData } from './type-guards';
 // UI callbacks to avoid circular dependency
 let hideControlPanelFn: (() => void) | null = null;
 let showMenuGuideFn: (() => void) | null = null;
+let converterModulePromise: Promise<typeof import('./converter')> | null = null;
+
+/**
+ * Lazily load the converter module so bridge events do not inflate homepage bundle size.
+ */
+async function getConverterModule(): Promise<typeof import('./converter')> {
+  if (!converterModulePromise) {
+    converterModulePromise = import('./converter');
+  }
+
+  return converterModulePromise;
+}
 
 export function setEventUICallbacks(callbacks: { hideControlPanel: () => void; showMenuGuide: () => void }): void {
   hideControlPanelFn = callbacks.hideControlPanel;
@@ -54,15 +65,16 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
 
     const { removeLoading } = showLoading();
     try {
+      const converter = await getConverterModule();
       const file = await MessageCodec.decodeFileChunked(chunkState.chunks);
       setDocmentObj({
         fileName: file.name,
         file: file,
         url: await createObjectURL(file),
       });
-      await initX2T();
+      await converter.initX2T();
       const { fileName, file: fileBlob } = getDocmentObj();
-      await handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
+      await converter.handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
       // Show menu guide after document is loaded
       if (showMenuGuideFn) {
         setTimeout(() => {

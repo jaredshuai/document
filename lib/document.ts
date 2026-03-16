@@ -1,6 +1,5 @@
 import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
-import { handleDocumentOperation, initX2T, loadEditorApi, loadScript } from './converter';
 import { showLoading } from './loading';
 import { determineFilename } from './url-utils';
 import { formatErrorMessage } from './error-utils';
@@ -11,6 +10,18 @@ import { getFileInputAccept } from './file-picker';
 let hideControlPanelFn: (() => void) | null = null;
 let showControlPanelFn: (() => void) | null = null;
 let showMenuGuideFn: (() => void) | null = null;
+let converterModulePromise: Promise<typeof import('./converter')> | null = null;
+
+/**
+ * Lazily load the converter module so homepage startup can stay lightweight.
+ */
+async function getConverterModule(): Promise<typeof import('./converter')> {
+  if (!converterModulePromise) {
+    converterModulePromise = import('./converter');
+  }
+
+  return converterModulePromise;
+}
 
 export function setUICallbacks(callbacks: {
   hideControlPanel: () => void;
@@ -33,6 +44,7 @@ export const onCreateNew = async (ext: string): Promise<void> => {
   // Note: Loading is now shown in the menu button click handler
   // This function should not show loading again to avoid double loading indicators
   try {
+    const converter = await getConverterModule();
     // Always hide control panel and ensure FAB is visible when creating new document
     if (hideControlPanelFn) {
       hideControlPanelFn();
@@ -41,11 +53,11 @@ export const onCreateNew = async (ext: string): Promise<void> => {
       fileName: 'New_Document' + ext,
       file: undefined,
     });
-    await loadScript();
-    await loadEditorApi();
-    await initX2T();
+    await converter.loadScript();
+    await converter.loadEditorApi();
+    await converter.initX2T();
     const { fileName, file: fileBlob } = getDocmentObj();
-    await handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
+    await converter.handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
     // Show menu guide after document is loaded
     if (showMenuGuideFn) {
       setTimeout(() => {
@@ -79,6 +91,7 @@ export const onOpenDocument = (): void => {
     if (file) {
       const { removeLoading } = showLoading();
       try {
+        const converter = await getConverterModule();
         if (hideControlPanelFn) {
           hideControlPanelFn();
         }
@@ -87,9 +100,9 @@ export const onOpenDocument = (): void => {
           file: file,
           url: await createObjectURL(file),
         });
-        await initX2T();
+        await converter.initX2T();
         const { fileName, file: fileBlob } = getDocmentObj();
-        await handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
+        await converter.handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
         // Clear file selection so the same file can be selected again
         fileInput.value = '';
         // Show menu guide after document is loaded
@@ -122,6 +135,7 @@ export const onOpenDocument = (): void => {
 export const openDocumentFromUrl = async (url: string, fileName?: string): Promise<void> => {
   const { removeLoading } = showLoading();
   try {
+    const converter = await getConverterModule();
     if (hideControlPanelFn) {
       hideControlPanelFn();
     }
@@ -155,9 +169,9 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     });
 
     // Initialize and open document
-    await initX2T();
+    await converter.initX2T();
     const { fileName: docFileName, file: fileBlob } = getDocmentObj();
-    await handleDocumentOperation({ file: fileBlob, fileName: docFileName, isNew: !fileBlob });
+    await converter.handleDocumentOperation({ file: fileBlob, fileName: docFileName, isNew: !fileBlob });
 
     // Show menu guide after document is loaded
     if (showMenuGuideFn) {
