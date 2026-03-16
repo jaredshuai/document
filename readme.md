@@ -74,6 +74,38 @@ This application supports offline usage via PWA (Progressive Web App) technology
 
 **Note**: When both `file` and `src` are provided, `file` takes priority. Remote URLs must support CORS.
 
+### Embed in a Host Web Page
+
+You can embed the editor in a same-origin iframe and control it from the host page.
+
+#### Quick Demo
+
+After starting the app locally, open `/embed-demo.html` to see a working host-page example. The demo page:
+
+- Embeds the editor in an iframe
+- Calls `iframe.contentWindow.onCreateNew()` to create new documents
+- Reloads the iframe with `?src=` to open remote documents
+
+#### Minimal Integration Example
+
+```html
+<iframe id="office-editor" src="/"></iframe>
+<button onclick="openWord()">New Word</button>
+
+<script>
+  async function openWord() {
+    const editorWindow = document.getElementById('office-editor').contentWindow;
+    await editorWindow.onCreateNew('.docx');
+  }
+</script>
+```
+
+#### Integration Notes
+
+- Host-to-editor method calls require the iframe to be **same-origin**
+- Opening a remote file still requires the remote server to allow **CORS**
+- You can also preload a document by setting the iframe URL to `/?src=<encoded-url>`
+
 ### As a Component Library
 
 This project provides foundational services for document preview components in the [@ranui/preview](https://www.npmjs.com/package/@ranui/preview) WebComponent library.

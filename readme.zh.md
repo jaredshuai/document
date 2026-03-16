@@ -74,6 +74,38 @@
 
 **注意**: 当同时提供 `file` 和 `src` 参数时，`file` 参数优先。远程 URL 必须支持 CORS。
 
+### 嵌入宿主页
+
+您可以把编辑器作为同源 iframe 嵌入到宿主页中，并由宿主页主动控制编辑器行为。
+
+#### 快速示例页
+
+本地启动后，直接访问 `/embed-demo.html` 即可看到一个完整可运行的宿主页示例。该页面演示了：
+
+- 在宿主页中 iframe 嵌入编辑器
+- 通过 `iframe.contentWindow.onCreateNew()` 新建文档
+- 通过重新加载 `?src=` 参数在 iframe 中打开远程文档
+
+#### 最小接入示例
+
+```html
+<iframe id="office-editor" src="/"></iframe>
+<button onclick="openWord()">新建 Word</button>
+
+<script>
+  async function openWord() {
+    const editorWindow = document.getElementById('office-editor').contentWindow;
+    await editorWindow.onCreateNew('.docx');
+  }
+</script>
+```
+
+#### 接入注意事项
+
+- 宿主页直接调用编辑器方法时，iframe 必须与宿主页保持 **同源**
+- 通过 URL 打开远程文档时，远程文件服务器仍需允许 **CORS**
+- 如果想在 iframe 初始加载时就打开文档，可以把地址设置为 `/?src=<编码后的文档地址>`
+
 ### 作为组件库使用
 
 本项目为 [@ranui/preview](https://www.npmjs.com/package/@ranui/preview) WebComponent 组件库提供文档预览组件的基础服务支持。

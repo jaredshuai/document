@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document Editor Embed Demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #1f2937;
+      }
+
+      .page {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        min-height: 100vh;
+      }
+
+      .hero {
+        padding: 20px 24px 8px;
+      }
+
+      .hero h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+
+      .hero p {
+        margin: 0;
+        color: #4b5563;
+        line-height: 1.5;
+      }
+
+      .toolbar {
+        display: grid;
+        gap: 12px;
+        padding: 16px 24px;
+        background: #ffffff;
+        border-top: 1px solid #e5e7eb;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      button {
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 10px 14px;
+        color: #0f172a;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      button.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+      }
+
+      button:hover {
+        filter: brightness(0.98);
+      }
+
+      input[type='url'] {
+        flex: 1 1 340px;
+        min-width: 240px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+
+      .status {
+        min-height: 20px;
+        font-size: 14px;
+        color: #1d4ed8;
+      }
+
+      .status.error {
+        color: #b91c1c;
+      }
+
+      .status.success {
+        color: #047857;
+      }
+
+      .frame-shell {
+        padding: 20px 24px 24px;
+      }
+
+      iframe {
+        width: 100%;
+        height: calc(100vh - 230px);
+        min-height: 700px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .note {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <h1>Document Editor Embed Demo</h1>
+        <p>
+          This page simulates a host website embedding the editor in an iframe and controlling it through
+          the exposed same-origin APIs.
+        </p>
+      </section>
+
+      <section class="toolbar">
+        <div class="toolbar-row">
+          <button class="primary" id="reload-editor" type="button">Reload editor</button>
+          <button id="new-word" type="button">New Word</button>
+          <button id="new-excel" type="button">New Excel</button>
+          <button id="new-powerpoint" type="button">New PowerPoint</button>
+        </div>
+
+        <div class="toolbar-row">
+          <input
+            id="document-url"
+            type="url"
+            placeholder="https://example.com/document.docx"
+            value=""
+          />
+          <button id="open-by-url" type="button">Open URL in iframe</button>
+        </div>
+
+        <div class="status" id="status">Waiting for editor iframe to finish loading.</div>
+      </section>
+
+      <section class="frame-shell">
+        <iframe
+          id="editor-frame"
+          src="./"
+          title="Embedded Document Editor"
+          referrerpolicy="no-referrer"
+        ></iframe>
+        <div class="note">
+          Host-to-editor method calls require the iframe to be same-origin. Opening by URL still requires
+          the remote file server to allow CORS.
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const editorFrame = document.getElementById('editor-frame');
+      const statusElement = document.getElementById('status');
+      const documentUrlInput = document.getElementById('document-url');
+
+      /**
+       * Update the visible host-side status message.
+       */
+      function setStatus(message, kind = 'info') {
+        statusElement.textContent = message;
+        statusElement.className = kind === 'info' ? 'status' : `status ${kind}`;
+      }
+
+      /**
+       * Return the embedded editor window if it is available.
+       */
+      function getEditorWindow() {
+        return editorFrame.contentWindow;
+      }
+
+      /**
+       * Wait until the embedded editor exposes its same-origin host API.
+       */
+      async function waitForEditorApi(timeoutMs = 15000) {
+        const startedAt = Date.now();
+
+        while (Date.now() - startedAt < timeoutMs) {
+          const editorWindow = getEditorWindow();
+          if (editorWindow && typeof editorWindow.onCreateNew === 'function') {
+            return editorWindow;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        throw new Error('Editor API did not become ready in time.');
+      }
+
+      /**
+       * Reload the iframe to its homepage, optionally with a document URL parameter.
+       */
+      function reloadEditor(src = './') {
+        editorFrame.src = src;
+        setStatus('Editor iframe reloading...', 'info');
+      }
+
+      /**
+       * Call the embedded editor same-origin API to create a new document.
+       */
+      async function createNewDocument(ext) {
+        try {
+          setStatus(`Opening a new ${ext} document...`, 'info');
+          const editorWindow = await waitForEditorApi();
+          await editorWindow.onCreateNew(ext);
+          setStatus(`Editor is creating a new ${ext} document.`, 'success');
+        } catch (error) {
+          setStatus(`Failed to create document: ${error.message}`, 'error');
+        }
+      }
+
+      /**
+       * Reload the iframe and ask it to open a remote document through URL parameters.
+       */
+      function openDocumentByUrl() {
+        const url = documentUrlInput.value.trim();
+        if (!url) {
+          setStatus('Please enter a document URL first.', 'error');
+          return;
+        }
+
+        reloadEditor(`./?src=${encodeURIComponent(url)}`);
+      }
+
+      editorFrame.addEventListener('load', () => {
+        setStatus('Editor iframe loaded. Host controls are ready for same-origin actions.', 'success');
+      });
+
+      document.getElementById('reload-editor').addEventListener('click', () => {
+        reloadEditor();
+      });
+
+      document.getElementById('new-word').addEventListener('click', async () => {
+        await createNewDocument('.docx');
+      });
+
+      document.getElementById('new-excel').addEventListener('click', async () => {
+        await createNewDocument('.xlsx');
+      });
+
+      document.getElementById('new-powerpoint').addEventListener('click', async () => {
+        await createNewDocument('.pptx');
+      });
+
+      document.getElementById('open-by-url').addEventListener('click', () => {
+        openDocumentByUrl();
+      });
+    </script>
+  </body>
+</html>
