@@ -53,5 +53,10 @@ export function emitHostEvent(event: string, data?: Record<string, unknown>): vo
   });
 
   const targetOrigin = hostMessageOrigin ?? window.location.origin;
-  target.postMessage(encoded, targetOrigin);
+  if (target instanceof Window) {
+    target.postMessage(encoded, targetOrigin);
+    return;
+  }
+
+  target.postMessage(encoded);
 }
