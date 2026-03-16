@@ -29,11 +29,19 @@ function getMimeType(filePath) {
     return mimes[ext] || 'application/octet-stream';
 }
 
+/**
+ * Recursively walk a directory and invoke the callback for each file.
+ */
 function walkDir(dir, callback) {
     fs.readdirSync(dir).forEach((f) => {
         const dirPath = path.join(dir, f);
         const isDirectory = fs.statSync(dirPath).isDirectory();
-        isDirectory ? walkDir(dirPath, callback) : callback(path.join(dir, f));
+        if (isDirectory) {
+            walkDir(dirPath, callback);
+            return;
+        }
+
+        callback(path.join(dir, f));
     });
 }
 

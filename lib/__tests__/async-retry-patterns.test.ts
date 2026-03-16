@@ -512,11 +512,14 @@ describe('Concurrent Operations', () => {
       };
 
       // Simple concurrency limiter
+      /**
+       * Run tasks with a fixed concurrency limit while preserving result order.
+       */
       const withConcurrencyLimit = async <T>(
         tasks: (() => Promise<T>)[],
         limit: number
       ): Promise<T[]> => {
-        const results: T[] = new Array(tasks.length);
+        const results: T[] = [];
         let currentIndex = 0;
 
         const runNext = async (): Promise<void> => {

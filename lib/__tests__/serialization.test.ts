@@ -402,7 +402,8 @@ describe('Serialization: Chunk Data Pipeline', () => {
   ): RenderOfficeData {
     // Simulate how chunks would be created
     // Note: btoa only handles ASCII, for Unicode we'd use TextEncoder + base64
-    const encodedData = data.match(/^[\x00-\x7F]*$/) ? btoa(data) : Buffer.from(data).toString('base64');
+    const isAsciiOnly = Array.from(data).every((char) => (char.codePointAt(0) ?? 0) <= 0x7f);
+    const encodedData = isAsciiOnly ? btoa(data) : Buffer.from(data).toString('base64');
     return {
       chunkIndex,
       data: encodedData, // Base64 encode

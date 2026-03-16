@@ -140,6 +140,9 @@ export function createEditorInstance(config: {
   return queueEditorOperation(async () => {
     const { fileName, fileType, binData, media: mediaUrls } = config;
 
+    // Ensure the OnlyOffice API is available regardless of how the page was loaded.
+    await loadEditorApi();
+
     // Check if there's an existing editor that needs cleanup
     const hasExistingEditor = !!window.editor;
 
