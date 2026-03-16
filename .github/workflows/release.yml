@@ -19,19 +19,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
-        run: bash bin/build.sh
+        run: pnpm build
 
       - name: Create Single-File HTML
-        run: node bin/bundle_single_html.js
+        run: pnpm build:single
 
       - name: Create ZIP archive
         run: |
