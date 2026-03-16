@@ -104,23 +104,21 @@
 
 ```html
 <iframe id="office-editor" src="https://editor.example.com/"></iframe>
+<script src="https://editor.example.com/embed-host-sdk.js"></script>
 <button onclick="openWordViaMessage()">新建 Word</button>
 
 <script>
-  function encodeMessage(data) {
-    return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(data))));
-  }
+  const bridge = window.DocumentEditorHostBridge.create({
+    iframe: document.getElementById('office-editor'),
+    targetOrigin: 'https://editor.example.com',
+  });
 
-  function openWordViaMessage() {
-    const frame = document.getElementById('office-editor');
-    frame.contentWindow.postMessage(
-      encodeMessage({
-        id: `host-${Date.now()}`,
-        type: 'CREATE_NEW',
-        payload: { ext: '.docx' },
-      }),
-      'https://editor.example.com'
-    );
+  bridge.onHostEvent(({ event, data }) => {
+    console.log('Editor host event:', event, data);
+  });
+
+  async function openWordViaMessage() {
+    await bridge.createNew('.docx');
   }
 </script>
 ```
@@ -131,6 +129,10 @@
 - `CREATE_NEW`，payload 形如 `{ ext: '.docx' | '.xlsx' | '.pptx' }`
 - `OPEN_DOCUMENT_URL`，payload 形如 `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
 - `CLOSE_EDITOR`
+
+宿主 SDK 文件：
+
+- `/embed-host-sdk.js`
 
 当前通过 `postMessage` 回传给宿主的事件：
 

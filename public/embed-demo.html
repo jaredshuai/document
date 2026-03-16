@@ -151,14 +151,16 @@
       </section>
     </div>
 
+    <script src="./embed-host-sdk.js"></script>
     <script>
       const editorFrame = document.getElementById('editor-frame');
       const statusElement = document.getElementById('status');
       const eventLogElement = document.getElementById('event-log');
       const documentUrlInput = document.getElementById('document-url');
-      const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
-      const pendingResponses = new Map();
+      const hostBridge = window.DocumentEditorHostBridge.create({
+        iframe: editorFrame,
+        targetOrigin: window.location.origin,
+      });
 
       /**
        * Update the visible host-side status message.
@@ -176,79 +178,10 @@
       }
 
       /**
-       * Return the embedded editor window if it is available.
-       */
-      function getEditorWindow() {
-        return editorFrame.contentWindow;
-      }
-
-      /**
-       * Encode a postMessage payload using the same format expected by the editor bridge.
-       */
-      function encodeMessage(data) {
-        return btoa(String.fromCharCode(...encoder.encode(JSON.stringify(data))));
-      }
-
-      /**
-       * Decode an editor bridge message back into a plain object.
-       */
-      function decodeMessage(encoded) {
-        const binary = atob(encoded);
-        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-        return JSON.parse(decoder.decode(bytes));
-      }
-
-      /**
-       * Send a command to the embedded editor through postMessage and await the response.
-       */
-      function postEditorCommand(type, payload = {}) {
-        const editorWindow = getEditorWindow();
-        if (!editorWindow) {
-          return Promise.reject(new Error('Editor iframe is not available.'));
-        }
-
-        const id = `host-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const message = encodeMessage({ id, type, payload });
-
-        return new Promise((resolve, reject) => {
-          const timeoutId = window.setTimeout(() => {
-            pendingResponses.delete(id);
-            reject(new Error(`Timed out waiting for ${type} response.`));
-          }, 15000);
-
-          pendingResponses.set(id, {
-            resolve,
-            reject,
-            timeoutId,
-          });
-
-          editorWindow.postMessage(message, window.location.origin);
-        });
-      }
-
-      /**
-       * Wait until the embedded editor bridge starts responding to PING messages.
-       */
-      async function waitForEditorBridge(timeoutMs = 15000) {
-        const startedAt = Date.now();
-
-        while (Date.now() - startedAt < timeoutMs) {
-          try {
-            await postEditorCommand('PING');
-            return;
-          } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          }
-        }
-
-        throw new Error('Editor bridge did not become ready in time.');
-      }
-
-      /**
        * Reload the iframe to its homepage.
        */
       function reloadEditor() {
-        editorFrame.src = './';
+        hostBridge.reload('./');
         setStatus('Editor iframe reloading...', 'info');
       }
 
@@ -258,8 +191,7 @@
       async function createNewDocument(ext) {
         try {
           setStatus(`Sending CREATE_NEW for ${ext}...`, 'info');
-          await waitForEditorBridge();
-          await postEditorCommand('CREATE_NEW', { ext });
+          await hostBridge.createNew(ext);
           setStatus(`Editor accepted CREATE_NEW for ${ext}.`, 'success');
         } catch (error) {
           setStatus(`Failed to create document: ${error.message}`, 'error');
@@ -278,48 +210,21 @@
 
         try {
           setStatus('Sending OPEN_DOCUMENT_URL command...', 'info');
-          await waitForEditorBridge();
-          await postEditorCommand('OPEN_DOCUMENT_URL', { url });
+          await hostBridge.openDocumentUrl(url);
           setStatus('Editor accepted OPEN_DOCUMENT_URL.', 'success');
         } catch (error) {
           setStatus(`Failed to open URL: ${error.message}`, 'error');
         }
       }
 
-      window.addEventListener('message', (event) => {
-        if (event.origin !== window.location.origin || typeof event.data !== 'string') {
-          return;
-        }
-
-        let decoded;
-        try {
-          decoded = decodeMessage(event.data);
-        } catch {
-          return;
-        }
-
-        if (!decoded?.isResponse || !decoded.id) {
-          if (decoded?.type === 'HOST_EVENT' && decoded.payload?.event) {
-            const payload = decoded.payload;
-            const suffix =
-              payload.data && payload.data.fileName
-                ? ` (${payload.data.fileName})`
-                : payload.data && payload.data.message
-                  ? ` - ${payload.data.message}`
-                  : '';
-            setLatestEvent(`${payload.event}${suffix}`);
-          }
-          return;
-        }
-
-        const pending = pendingResponses.get(decoded.id);
-        if (!pending) {
-          return;
-        }
-
-        window.clearTimeout(pending.timeoutId);
-        pendingResponses.delete(decoded.id);
-        pending.resolve(decoded.payload);
+      hostBridge.onHostEvent((payload) => {
+        const suffix =
+          payload.data && payload.data.fileName
+            ? ` (${payload.data.fileName})`
+            : payload.data && payload.data.message
+              ? ` - ${payload.data.message}`
+              : '';
+        setLatestEvent(`${payload.event}${suffix}`);
       });
 
       /**
@@ -327,7 +232,7 @@
        */
       function handleFrameLoad() {
         setStatus('Editor iframe loaded. Waiting for bridge readiness...', 'info');
-        void waitForEditorBridge()
+        void hostBridge.waitForBridge()
           .then(() => {
             setStatus('Editor bridge is ready for postMessage commands.', 'success');
           })

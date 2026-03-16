@@ -104,23 +104,21 @@ After starting the app locally, open `/embed-demo.html` to see a working host-pa
 
 ```html
 <iframe id="office-editor" src="https://editor.example.com/"></iframe>
+<script src="https://editor.example.com/embed-host-sdk.js"></script>
 <button onclick="openWordViaMessage()">New Word</button>
 
 <script>
-  function encodeMessage(data) {
-    return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(data))));
-  }
+  const bridge = window.DocumentEditorHostBridge.create({
+    iframe: document.getElementById('office-editor'),
+    targetOrigin: 'https://editor.example.com',
+  });
 
-  function openWordViaMessage() {
-    const frame = document.getElementById('office-editor');
-    frame.contentWindow.postMessage(
-      encodeMessage({
-        id: `host-${Date.now()}`,
-        type: 'CREATE_NEW',
-        payload: { ext: '.docx' },
-      }),
-      'https://editor.example.com'
-    );
+  bridge.onHostEvent(({ event, data }) => {
+    console.log('Editor host event:', event, data);
+  });
+
+  async function openWordViaMessage() {
+    await bridge.createNew('.docx');
   }
 </script>
 ```
@@ -131,6 +129,10 @@ Supported host commands:
 - `CREATE_NEW` with payload `{ ext: '.docx' | '.xlsx' | '.pptx' }`
 - `OPEN_DOCUMENT_URL` with payload `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
 - `CLOSE_EDITOR`
+
+Host SDK file:
+
+- `/embed-host-sdk.js`
 
 Host callback events sent back through `postMessage`:
 
