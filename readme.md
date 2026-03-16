@@ -76,17 +76,17 @@ This application supports offline usage via PWA (Progressive Web App) technology
 
 ### Embed in a Host Web Page
 
-You can embed the editor in a same-origin iframe and control it from the host page.
+You can embed the editor in an iframe and control it from the host page either through a same-origin API or a lightweight `postMessage` bridge.
 
 #### Quick Demo
 
 After starting the app locally, open `/embed-demo.html` to see a working host-page example. The demo page:
 
 - Embeds the editor in an iframe
-- Calls `iframe.contentWindow.onCreateNew()` to create new documents
-- Reloads the iframe with `?src=` to open remote documents
+- Sends `CREATE_NEW` and `OPEN_DOCUMENT_URL` commands through `postMessage`
+- Shows the same iframe-based integration pattern that a host page can reuse
 
-#### Minimal Integration Example
+#### Option A: Same-Origin Direct API
 
 ```html
 <iframe id="office-editor" src="/"></iframe>
@@ -100,9 +100,42 @@ After starting the app locally, open `/embed-demo.html` to see a working host-pa
 </script>
 ```
 
+#### Option B: postMessage Bridge
+
+```html
+<iframe id="office-editor" src="https://editor.example.com/"></iframe>
+<button onclick="openWordViaMessage()">New Word</button>
+
+<script>
+  function encodeMessage(data) {
+    return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(data))));
+  }
+
+  function openWordViaMessage() {
+    const frame = document.getElementById('office-editor');
+    frame.contentWindow.postMessage(
+      encodeMessage({
+        id: `host-${Date.now()}`,
+        type: 'CREATE_NEW',
+        payload: { ext: '.docx' },
+      }),
+      'https://editor.example.com'
+    );
+  }
+</script>
+```
+
+Supported host commands:
+
+- `PING`
+- `CREATE_NEW` with payload `{ ext: '.docx' | '.xlsx' | '.pptx' }`
+- `OPEN_DOCUMENT_URL` with payload `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
+- `CLOSE_EDITOR`
+
 #### Integration Notes
 
-- Host-to-editor method calls require the iframe to be **same-origin**
+- Same-origin direct method calls require the iframe to be **same-origin**
+- `postMessage` control works better for plugin-like integrations and cross-window communication
 - Opening a remote file still requires the remote server to allow **CORS**
 - You can also preload a document by setting the iframe URL to `/?src=<encoded-url>`
 

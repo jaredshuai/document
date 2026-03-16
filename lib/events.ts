@@ -1,6 +1,7 @@
 import { MessageCodec, Platform, createObjectURL } from 'ranuts/utils';
 import type { MessageHandler } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
+import { onCreateNew, openDocumentFromUrl } from './document';
 import { showLoading } from './loading';
 import { updateRenderChunkState } from './render-workflow';
 import { isValidRenderOfficeData } from './type-guards';
@@ -38,7 +39,51 @@ export interface RenderOfficeData {
 
 let fileChunks: RenderOfficeData[] = [];
 
+/**
+ * Validate that a postMessage payload requests a supported new document extension.
+ */
+function isCreateNewPayload(payload: unknown): payload is { ext: string } {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'ext' in payload &&
+    typeof (payload as { ext: unknown }).ext === 'string'
+  );
+}
+
+/**
+ * Validate that a postMessage payload contains a remote document URL.
+ */
+function isOpenDocumentUrlPayload(payload: unknown): payload is { url: string; fileName?: string } {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'url' in payload &&
+    typeof (payload as { url: unknown }).url === 'string' &&
+    (!('fileName' in payload) || typeof (payload as { fileName?: unknown }).fileName === 'string')
+  );
+}
+
 export const events: Record<string, MessageHandler<any, unknown>> = {
+  PING: async () => {
+    return { ok: true };
+  },
+  CREATE_NEW: async (payload: unknown) => {
+    if (!isCreateNewPayload(payload)) {
+      throw new Error('Invalid CREATE_NEW payload');
+    }
+
+    await onCreateNew(payload.ext);
+    return { ok: true };
+  },
+  OPEN_DOCUMENT_URL: async (payload: unknown) => {
+    if (!isOpenDocumentUrlPayload(payload)) {
+      throw new Error('Invalid OPEN_DOCUMENT_URL payload');
+    }
+
+    await openDocumentFromUrl(payload.url, payload.fileName);
+    return { ok: true };
+  },
   RENDER_OFFICE: async (data: RenderOfficeData) => {
     // Validate incoming data from external source
     if (!isValidRenderOfficeData(data)) {

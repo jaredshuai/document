@@ -121,7 +121,7 @@
         <h1>Document Editor Embed Demo</h1>
         <p>
           This page simulates a host website embedding the editor in an iframe and controlling it through
-          the exposed same-origin APIs.
+          a lightweight <code>postMessage</code> command bridge.
         </p>
       </section>
 
@@ -154,7 +154,7 @@
           referrerpolicy="no-referrer"
         ></iframe>
         <div class="note">
-          Host-to-editor method calls require the iframe to be same-origin. Opening by URL still requires
+          The message bridge works best when the host knows the iframe origin. Opening by URL still requires
           the remote file server to allow CORS.
         </div>
       </section>
@@ -164,6 +164,9 @@
       const editorFrame = document.getElementById('editor-frame');
       const statusElement = document.getElementById('status');
       const documentUrlInput = document.getElementById('document-url');
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const pendingResponses = new Map();
 
       /**
        * Update the visible host-side status message.
@@ -181,61 +184,144 @@
       }
 
       /**
-       * Wait until the embedded editor exposes its same-origin host API.
+       * Encode a postMessage payload using the same format expected by the editor bridge.
        */
-      async function waitForEditorApi(timeoutMs = 15000) {
-        const startedAt = Date.now();
-
-        while (Date.now() - startedAt < timeoutMs) {
-          const editorWindow = getEditorWindow();
-          if (editorWindow && typeof editorWindow.onCreateNew === 'function') {
-            return editorWindow;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-
-        throw new Error('Editor API did not become ready in time.');
+      function encodeMessage(data) {
+        return btoa(String.fromCharCode(...encoder.encode(JSON.stringify(data))));
       }
 
       /**
-       * Reload the iframe to its homepage, optionally with a document URL parameter.
+       * Decode an editor bridge message back into a plain object.
        */
-      function reloadEditor(src = './') {
-        editorFrame.src = src;
+      function decodeMessage(encoded) {
+        const binary = atob(encoded);
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        return JSON.parse(decoder.decode(bytes));
+      }
+
+      /**
+       * Send a command to the embedded editor through postMessage and await the response.
+       */
+      function postEditorCommand(type, payload = {}) {
+        const editorWindow = getEditorWindow();
+        if (!editorWindow) {
+          return Promise.reject(new Error('Editor iframe is not available.'));
+        }
+
+        const id = `host-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const message = encodeMessage({ id, type, payload });
+
+        return new Promise((resolve, reject) => {
+          const timeoutId = window.setTimeout(() => {
+            pendingResponses.delete(id);
+            reject(new Error(`Timed out waiting for ${type} response.`));
+          }, 15000);
+
+          pendingResponses.set(id, {
+            resolve,
+            reject,
+            timeoutId,
+          });
+
+          editorWindow.postMessage(message, window.location.origin);
+        });
+      }
+
+      /**
+       * Wait until the embedded editor bridge starts responding to PING messages.
+       */
+      async function waitForEditorBridge(timeoutMs = 15000) {
+        const startedAt = Date.now();
+
+        while (Date.now() - startedAt < timeoutMs) {
+          try {
+            await postEditorCommand('PING');
+            return;
+          } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
+        }
+
+        throw new Error('Editor bridge did not become ready in time.');
+      }
+
+      /**
+       * Reload the iframe to its homepage.
+       */
+      function reloadEditor() {
+        editorFrame.src = './';
         setStatus('Editor iframe reloading...', 'info');
       }
 
       /**
-       * Call the embedded editor same-origin API to create a new document.
+       * Ask the embedded editor to create a new document through the message bridge.
        */
       async function createNewDocument(ext) {
         try {
-          setStatus(`Opening a new ${ext} document...`, 'info');
-          const editorWindow = await waitForEditorApi();
-          await editorWindow.onCreateNew(ext);
-          setStatus(`Editor is creating a new ${ext} document.`, 'success');
+          setStatus(`Sending CREATE_NEW for ${ext}...`, 'info');
+          await waitForEditorBridge();
+          await postEditorCommand('CREATE_NEW', { ext });
+          setStatus(`Editor accepted CREATE_NEW for ${ext}.`, 'success');
         } catch (error) {
           setStatus(`Failed to create document: ${error.message}`, 'error');
         }
       }
 
       /**
-       * Reload the iframe and ask it to open a remote document through URL parameters.
+       * Ask the embedded editor to open a remote document through the message bridge.
        */
-      function openDocumentByUrl() {
+      async function openDocumentByUrl() {
         const url = documentUrlInput.value.trim();
         if (!url) {
           setStatus('Please enter a document URL first.', 'error');
           return;
         }
 
-        reloadEditor(`./?src=${encodeURIComponent(url)}`);
+        try {
+          setStatus('Sending OPEN_DOCUMENT_URL command...', 'info');
+          await waitForEditorBridge();
+          await postEditorCommand('OPEN_DOCUMENT_URL', { url });
+          setStatus('Editor accepted OPEN_DOCUMENT_URL.', 'success');
+        } catch (error) {
+          setStatus(`Failed to open URL: ${error.message}`, 'error');
+        }
       }
 
-      editorFrame.addEventListener('load', () => {
-        setStatus('Editor iframe loaded. Host controls are ready for same-origin actions.', 'success');
+      window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin || typeof event.data !== 'string') {
+          return;
+        }
+
+        const decoded = decodeMessage(event.data);
+        if (!decoded?.isResponse || !decoded.id) {
+          return;
+        }
+
+        const pending = pendingResponses.get(decoded.id);
+        if (!pending) {
+          return;
+        }
+
+        window.clearTimeout(pending.timeoutId);
+        pendingResponses.delete(decoded.id);
+        pending.resolve(decoded.payload);
       });
+
+      /**
+       * Reflect iframe load completion in the host UI.
+       */
+      function handleFrameLoad() {
+        setStatus('Editor iframe loaded. Waiting for bridge readiness...', 'info');
+        void waitForEditorBridge()
+          .then(() => {
+            setStatus('Editor bridge is ready for postMessage commands.', 'success');
+          })
+          .catch((error) => {
+            setStatus(`Bridge not ready yet: ${error.message}`, 'error');
+          });
+      }
+
+      editorFrame.addEventListener('load', handleFrameLoad);
 
       document.getElementById('reload-editor').addEventListener('click', () => {
         reloadEditor();
@@ -253,8 +339,8 @@
         await createNewDocument('.pptx');
       });
 
-      document.getElementById('open-by-url').addEventListener('click', () => {
-        openDocumentByUrl();
+      document.getElementById('open-by-url').addEventListener('click', async () => {
+        await openDocumentByUrl();
       });
     </script>
   </body>
