@@ -139,6 +139,7 @@
         </div>
 
         <div class="status" id="status">Waiting for editor iframe to finish loading.</div>
+        <div class="note" id="event-log">Latest host event: none yet.</div>
       </section>
 
       <section class="frame-shell">
@@ -153,6 +154,7 @@
     <script>
       const editorFrame = document.getElementById('editor-frame');
       const statusElement = document.getElementById('status');
+      const eventLogElement = document.getElementById('event-log');
       const documentUrlInput = document.getElementById('document-url');
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
@@ -164,6 +166,13 @@
       function setStatus(message, kind = 'info') {
         statusElement.textContent = message;
         statusElement.className = kind === 'info' ? 'status' : `status ${kind}`;
+      }
+
+      /**
+       * Render the latest asynchronous host callback event.
+       */
+      function setLatestEvent(message) {
+        eventLogElement.textContent = `Latest host event: ${message}`;
       }
 
       /**
@@ -290,6 +299,16 @@
         }
 
         if (!decoded?.isResponse || !decoded.id) {
+          if (decoded?.type === 'HOST_EVENT' && decoded.payload?.event) {
+            const payload = decoded.payload;
+            const suffix =
+              payload.data && payload.data.fileName
+                ? ` (${payload.data.fileName})`
+                : payload.data && payload.data.message
+                  ? ` - ${payload.data.message}`
+                  : '';
+            setLatestEvent(`${payload.event}${suffix}`);
+          }
           return;
         }
 

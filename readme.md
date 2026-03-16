@@ -132,6 +132,13 @@ Supported host commands:
 - `OPEN_DOCUMENT_URL` with payload `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
 - `CLOSE_EDITOR`
 
+Host callback events sent back through `postMessage`:
+
+- `BRIDGE_READY`
+- `DOCUMENT_READY`
+- `DOCUMENT_OPEN_FAILED`
+- `EDITOR_CLOSED`
+
 #### Integration Notes
 
 - Same-origin direct method calls require the iframe to be **same-origin**

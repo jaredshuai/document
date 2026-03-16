@@ -8,6 +8,7 @@ import { getEditorCleanupDelay } from './editor-utils';
 import { createEditorConfig } from './editor-config';
 import { createOperationQueue } from './operation-queue';
 import { validateWriteFileData, createMediaUrlKey } from './media-url';
+import { emitHostEvent } from './host-bridge';
 
 // Import converter function to avoid circular dependency
 let convertBinToDocumentAndDownloadFn:
@@ -201,6 +202,10 @@ export function createEditorInstance(config: {
       },
       onDocumentReady: () => {
         console.log(`${t('documentLoaded')}${fileName}`);
+        emitHostEvent('DOCUMENT_READY', {
+          fileName,
+          fileType,
+        });
         // Note: For CSV files, the save dialog may show XLSX format,
         // but the actual save will be forced to CSV format in handleSaveDocument
       },

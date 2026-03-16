@@ -132,6 +132,13 @@
 - `OPEN_DOCUMENT_URL`，payload 形如 `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
 - `CLOSE_EDITOR`
 
+当前通过 `postMessage` 回传给宿主的事件：
+
+- `BRIDGE_READY`
+- `DOCUMENT_READY`
+- `DOCUMENT_OPEN_FAILED`
+- `EDITOR_CLOSED`
+
 #### 接入注意事项
 
 - 宿主页直接调用编辑器方法时，iframe 必须与宿主页保持 **同源**

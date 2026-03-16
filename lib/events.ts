@@ -2,6 +2,7 @@ import { MessageCodec, Platform, createObjectURL } from 'ranuts/utils';
 import type { MessageHandler } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
 import { onCreateNew, openDocumentFromUrl } from './document';
+import { emitHostEvent, initHostBridgeTracking } from './host-bridge';
 import { showLoading } from './loading';
 import { updateRenderChunkState } from './render-workflow';
 import { isValidRenderOfficeData } from './type-guards';
@@ -143,9 +144,14 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
     if (window.editor && typeof window.editor.destroyEditor === 'function') {
       window.editor.destroyEditor();
     }
+    emitHostEvent('EDITOR_CLOSED');
   },
 };
 
 export function initEvents(): void {
+  initHostBridgeTracking();
   Platform.init(events);
+  queueMicrotask(() => {
+    emitHostEvent('BRIDGE_READY');
+  });
 }

@@ -1,5 +1,6 @@
 import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
+import { emitHostEvent } from './host-bridge';
 import { showLoading } from './loading';
 import { determineFilename } from './url-utils';
 import { formatErrorMessage } from './error-utils';
@@ -66,6 +67,11 @@ export const onCreateNew = async (ext: string): Promise<void> => {
     }
   } catch (error) {
     console.error('Error creating new document:', error);
+    emitHostEvent('DOCUMENT_OPEN_FAILED', {
+      action: 'CREATE_NEW',
+      ext,
+      message: formatErrorMessage(error),
+    });
     // Ensure control panel is shown on error
     if (showControlPanelFn) {
       showControlPanelFn();
@@ -113,6 +119,11 @@ export const onOpenDocument = (): void => {
         }
       } catch (error) {
         console.error('Error opening document:', error);
+        emitHostEvent('DOCUMENT_OPEN_FAILED', {
+          action: 'OPEN_LOCAL_FILE',
+          fileName: file.name,
+          message: formatErrorMessage(error),
+        });
         // Ensure control panel is shown on error
         if (showControlPanelFn) {
           showControlPanelFn();
@@ -188,7 +199,14 @@ export const openDocumentFromUrl = async (
     }
   } catch (error) {
     console.error('Error opening document from URL:', error);
-    alert(`Failed to open document: ${formatErrorMessage(error)}`);
+    const message = formatErrorMessage(error);
+    emitHostEvent('DOCUMENT_OPEN_FAILED', {
+      action: 'OPEN_DOCUMENT_URL',
+      url,
+      fileName,
+      message,
+    });
+    alert(`Failed to open document: ${message}`);
     if (showControlPanelFn) {
       showControlPanelFn();
     }
