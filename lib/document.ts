@@ -132,7 +132,14 @@ export const onOpenDocument = (): void => {
   fileInput.click();
 };
 
-export const openDocumentFromUrl = async (url: string, fileName?: string): Promise<void> => {
+/**
+ * Open a remote document URL inside the editor, optionally rethrowing failures to the caller.
+ */
+export const openDocumentFromUrl = async (
+  url: string,
+  fileName?: string,
+  options?: { rethrow?: boolean },
+): Promise<void> => {
   const { removeLoading } = showLoading();
   try {
     const converter = await getConverterModule();
@@ -184,6 +191,9 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     alert(`Failed to open document: ${formatErrorMessage(error)}`);
     if (showControlPanelFn) {
       showControlPanelFn();
+    }
+    if (options?.rethrow) {
+      throw error;
     }
   } finally {
     removeLoading();

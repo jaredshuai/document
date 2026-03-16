@@ -120,8 +120,8 @@
       <section class="hero">
         <h1>Document Editor Embed Demo</h1>
         <p>
-          This page simulates a host website embedding the editor in an iframe and controlling it through
-          a lightweight <code>postMessage</code> command bridge.
+          This page simulates a host website embedding the editor in an iframe and controlling it through a lightweight
+          <code>postMessage</code> command bridge.
         </p>
       </section>
 
@@ -134,12 +134,7 @@
         </div>
 
         <div class="toolbar-row">
-          <input
-            id="document-url"
-            type="url"
-            placeholder="https://example.com/document.docx"
-            value=""
-          />
+          <input id="document-url" type="url" placeholder="https://example.com/document.docx" value="" />
           <button id="open-by-url" type="button">Open URL in iframe</button>
         </div>
 
@@ -147,15 +142,10 @@
       </section>
 
       <section class="frame-shell">
-        <iframe
-          id="editor-frame"
-          src="./"
-          title="Embedded Document Editor"
-          referrerpolicy="no-referrer"
-        ></iframe>
+        <iframe id="editor-frame" src="./" title="Embedded Document Editor" referrerpolicy="no-referrer"></iframe>
         <div class="note">
-          The message bridge works best when the host knows the iframe origin. Opening by URL still requires
-          the remote file server to allow CORS.
+          The message bridge works best when the host knows the iframe origin. Opening by URL still requires the remote
+          file server to allow CORS.
         </div>
       </section>
     </div>
@@ -292,7 +282,13 @@
           return;
         }
 
-        const decoded = decodeMessage(event.data);
+        let decoded;
+        try {
+          decoded = decodeMessage(event.data);
+        } catch {
+          return;
+        }
+
         if (!decoded?.isResponse || !decoded.id) {
           return;
         }

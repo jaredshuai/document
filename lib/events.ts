@@ -81,7 +81,7 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
       throw new Error('Invalid OPEN_DOCUMENT_URL payload');
     }
 
-    await openDocumentFromUrl(payload.url, payload.fileName);
+    await openDocumentFromUrl(payload.url, payload.fileName, { rethrow: true });
     return { ok: true };
   },
   RENDER_OFFICE: async (data: RenderOfficeData) => {
