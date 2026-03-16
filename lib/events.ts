@@ -73,16 +73,20 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
       throw new Error('Invalid CREATE_NEW payload');
     }
 
-    await onCreateNew(payload.ext);
-    return { ok: true };
+    void onCreateNew(payload.ext).catch((error) => {
+      console.error('CREATE_NEW command failed:', error);
+    });
+    return { ok: true, accepted: true };
   },
   OPEN_DOCUMENT_URL: async (payload: unknown) => {
     if (!isOpenDocumentUrlPayload(payload)) {
       throw new Error('Invalid OPEN_DOCUMENT_URL payload');
     }
 
-    await openDocumentFromUrl(payload.url, payload.fileName, { rethrow: true });
-    return { ok: true };
+    void openDocumentFromUrl(payload.url, payload.fileName, { rethrow: true }).catch((error) => {
+      console.error('OPEN_DOCUMENT_URL command failed:', error);
+    });
+    return { ok: true, accepted: true };
   },
   RENDER_OFFICE: async (data: RenderOfficeData) => {
     // Validate incoming data from external source
