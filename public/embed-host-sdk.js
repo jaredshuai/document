@@ -172,6 +172,10 @@
 
       global.clearTimeout(pending.timeoutId);
       this.pendingResponses.delete(decoded.id);
+      if (decoded.isError || decoded.payload?.ok === false) {
+        pending.reject(new Error(decoded.payload?.error || 'Editor bridge command failed.'));
+        return;
+      }
       pending.resolve(decoded.payload);
     }
   }

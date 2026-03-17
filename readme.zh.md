@@ -103,7 +103,7 @@
 #### 方式 B：postMessage 消息桥
 
 ```html
-<iframe id="office-editor" src="https://editor.example.com/"></iframe>
+<iframe id="office-editor" src="https://editor.example.com/?hostOrigin=https%3A%2F%2Fhost.example.com"></iframe>
 <script src="https://editor.example.com/embed-host-sdk.js"></script>
 <button onclick="openWordViaMessage()">新建 Word</button>
 
@@ -145,6 +145,7 @@
 
 - 宿主页直接调用编辑器方法时，iframe 必须与宿主页保持 **同源**
 - 更接近插件化集成的场景，建议优先使用 `postMessage` 控制
+- 如果宿主页与编辑器跨域，请在 iframe URL 中追加 `hostOrigin=<宿主页面 origin>`，让编辑器只接受受信任来源的命令
 - 通过 URL 打开远程文档时，远程文件服务器仍需允许 **CORS**
 - 如果想在 iframe 初始加载时就打开文档，可以把地址设置为 `/?src=<编码后的文档地址>`
 
@@ -212,8 +213,8 @@ services:
 ```bash
 git clone https://github.com/ranuts/document.git
 cd document
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### 运行测试

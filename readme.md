@@ -103,7 +103,7 @@ After starting the app locally, open `/embed-demo.html` to see a working host-pa
 #### Option B: postMessage Bridge
 
 ```html
-<iframe id="office-editor" src="https://editor.example.com/"></iframe>
+<iframe id="office-editor" src="https://editor.example.com/?hostOrigin=https%3A%2F%2Fhost.example.com"></iframe>
 <script src="https://editor.example.com/embed-host-sdk.js"></script>
 <button onclick="openWordViaMessage()">New Word</button>
 
@@ -145,6 +145,7 @@ Host callback events sent back through `postMessage`:
 
 - Same-origin direct method calls require the iframe to be **same-origin**
 - `postMessage` control works better for plugin-like integrations and cross-window communication
+- For cross-origin hosts, add `hostOrigin=<your-host-origin>` to the iframe URL so the editor only accepts trusted commands
 - Opening a remote file still requires the remote server to allow **CORS**
 - You can also preload a document by setting the iframe URL to `/?src=<encoded-url>`
 
@@ -212,8 +213,8 @@ services:
 ```bash
 git clone https://github.com/ranuts/document.git
 cd document
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### Running Tests

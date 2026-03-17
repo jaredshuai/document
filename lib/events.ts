@@ -1,8 +1,8 @@
-import { MessageCodec, Platform, createObjectURL } from 'ranuts/utils';
+import { MessageCodec, createObjectURL } from 'ranuts/utils';
 import type { MessageHandler } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
 import { onCreateNew, openDocumentFromUrl } from './document';
-import { emitHostEvent, initHostBridgeTracking } from './host-bridge';
+import { emitHostEvent, initHostBridgeTracking, isAllowedHostOrigin } from './host-bridge';
 import { showLoading } from './loading';
 import { updateRenderChunkState } from './render-workflow';
 import { isValidRenderOfficeData } from './type-guards';
@@ -150,7 +150,43 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
 
 export function initEvents(): void {
   initHostBridgeTracking();
-  Platform.init(events);
+  const initBridge = async (event: MessageEvent) => {
+    if (typeof event.data !== 'string' || !isAllowedHostOrigin(event.origin)) {
+      return;
+    }
+
+    const decodedData = MessageCodec.decode(String(event.data));
+    if (!decodedData) {
+      return;
+    }
+
+    const { type, payload, id } = decodedData;
+    const handler = events[type];
+    if (typeof handler !== 'function') {
+      return;
+    }
+
+    try {
+      const result = await handler(payload);
+      const encodedData = MessageCodec.encode({ type, payload: result, id, isResponse: true });
+      event.source?.postMessage(encodedData, event.origin);
+    } catch (error) {
+      const encodedData = MessageCodec.encode({
+        type,
+        payload: {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        id,
+        isResponse: true,
+        isError: true,
+      });
+      event.source?.postMessage(encodedData, event.origin);
+    }
+  };
+
+  window.removeEventListener('message', initBridge);
+  window.addEventListener('message', initBridge);
   queueMicrotask(() => {
     emitHostEvent('BRIDGE_READY');
   });
