@@ -74,6 +74,81 @@
 
 **注意**: 当同时提供 `file` 和 `src` 参数时，`file` 参数优先。远程 URL 必须支持 CORS。
 
+### 嵌入宿主页
+
+您可以把编辑器作为 iframe 嵌入到宿主页中，并通过同源 API 或轻量级 `postMessage` 消息桥主动控制编辑器行为。
+
+#### 快速示例页
+
+本地启动后，直接访问 `/embed-demo.html` 即可看到一个完整可运行的宿主页示例。该页面演示了：
+
+- 在宿主页中 iframe 嵌入编辑器
+- 通过 `postMessage` 发送 `CREATE_NEW` 和 `OPEN_DOCUMENT_URL` 控制命令
+- 用接近真实插件集成的方式驱动 iframe 内编辑器
+
+#### 方式 A：同源直接调用
+
+```html
+<iframe id="office-editor" src="/"></iframe>
+<button onclick="openWord()">新建 Word</button>
+
+<script>
+  async function openWord() {
+    const editorWindow = document.getElementById('office-editor').contentWindow;
+    await editorWindow.onCreateNew('.docx');
+  }
+</script>
+```
+
+#### 方式 B：postMessage 消息桥
+
+```html
+<iframe id="office-editor" src="https://editor.example.com/?hostOrigin=https%3A%2F%2Fhost.example.com"></iframe>
+<script src="https://editor.example.com/embed-host-sdk.js"></script>
+<button onclick="openWordViaMessage()">新建 Word</button>
+
+<script>
+  const bridge = window.DocumentEditorHostBridge.create({
+    iframe: document.getElementById('office-editor'),
+    targetOrigin: 'https://editor.example.com',
+  });
+
+  bridge.onHostEvent(({ event, data }) => {
+    console.log('Editor host event:', event, data);
+  });
+
+  async function openWordViaMessage() {
+    await bridge.createNew('.docx');
+  }
+</script>
+```
+
+当前支持的宿主命令：
+
+- `PING`
+- `CREATE_NEW`，payload 形如 `{ ext: '.docx' | '.xlsx' | '.pptx' }`
+- `OPEN_DOCUMENT_URL`，payload 形如 `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
+- `CLOSE_EDITOR`
+
+宿主 SDK 文件：
+
+- `/embed-host-sdk.js`
+
+当前通过 `postMessage` 回传给宿主的事件：
+
+- `BRIDGE_READY`
+- `DOCUMENT_READY`
+- `DOCUMENT_OPEN_FAILED`
+- `EDITOR_CLOSED`
+
+#### 接入注意事项
+
+- 宿主页直接调用编辑器方法时，iframe 必须与宿主页保持 **同源**
+- 更接近插件化集成的场景，建议优先使用 `postMessage` 控制
+- 如果宿主页与编辑器跨域，请在 iframe URL 中追加 `hostOrigin=<宿主页面 origin>`，让编辑器只接受受信任来源的命令
+- 通过 URL 打开远程文档时，远程文件服务器仍需允许 **CORS**
+- 如果想在 iframe 初始加载时就打开文档，可以把地址设置为 `/?src=<编码后的文档地址>`
+
 ### 作为组件库使用
 
 本项目为 [@ranui/preview](https://www.npmjs.com/package/@ranui/preview) WebComponent 组件库提供文档预览组件的基础服务支持。
@@ -138,8 +213,8 @@ services:
 ```bash
 git clone https://github.com/ranuts/document.git
 cd document
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### 运行测试

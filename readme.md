@@ -74,6 +74,81 @@ This application supports offline usage via PWA (Progressive Web App) technology
 
 **Note**: When both `file` and `src` are provided, `file` takes priority. Remote URLs must support CORS.
 
+### Embed in a Host Web Page
+
+You can embed the editor in an iframe and control it from the host page either through a same-origin API or a lightweight `postMessage` bridge.
+
+#### Quick Demo
+
+After starting the app locally, open `/embed-demo.html` to see a working host-page example. The demo page:
+
+- Embeds the editor in an iframe
+- Sends `CREATE_NEW` and `OPEN_DOCUMENT_URL` commands through `postMessage`
+- Shows the same iframe-based integration pattern that a host page can reuse
+
+#### Option A: Same-Origin Direct API
+
+```html
+<iframe id="office-editor" src="/"></iframe>
+<button onclick="openWord()">New Word</button>
+
+<script>
+  async function openWord() {
+    const editorWindow = document.getElementById('office-editor').contentWindow;
+    await editorWindow.onCreateNew('.docx');
+  }
+</script>
+```
+
+#### Option B: postMessage Bridge
+
+```html
+<iframe id="office-editor" src="https://editor.example.com/?hostOrigin=https%3A%2F%2Fhost.example.com"></iframe>
+<script src="https://editor.example.com/embed-host-sdk.js"></script>
+<button onclick="openWordViaMessage()">New Word</button>
+
+<script>
+  const bridge = window.DocumentEditorHostBridge.create({
+    iframe: document.getElementById('office-editor'),
+    targetOrigin: 'https://editor.example.com',
+  });
+
+  bridge.onHostEvent(({ event, data }) => {
+    console.log('Editor host event:', event, data);
+  });
+
+  async function openWordViaMessage() {
+    await bridge.createNew('.docx');
+  }
+</script>
+```
+
+Supported host commands:
+
+- `PING`
+- `CREATE_NEW` with payload `{ ext: '.docx' | '.xlsx' | '.pptx' }`
+- `OPEN_DOCUMENT_URL` with payload `{ url: 'https://example.com/file.docx', fileName?: 'custom.docx' }`
+- `CLOSE_EDITOR`
+
+Host SDK file:
+
+- `/embed-host-sdk.js`
+
+Host callback events sent back through `postMessage`:
+
+- `BRIDGE_READY`
+- `DOCUMENT_READY`
+- `DOCUMENT_OPEN_FAILED`
+- `EDITOR_CLOSED`
+
+#### Integration Notes
+
+- Same-origin direct method calls require the iframe to be **same-origin**
+- `postMessage` control works better for plugin-like integrations and cross-window communication
+- For cross-origin hosts, add `hostOrigin=<your-host-origin>` to the iframe URL so the editor only accepts trusted commands
+- Opening a remote file still requires the remote server to allow **CORS**
+- You can also preload a document by setting the iframe URL to `/?src=<encoded-url>`
+
 ### As a Component Library
 
 This project provides foundational services for document preview components in the [@ranui/preview](https://www.npmjs.com/package/@ranui/preview) WebComponent library.
@@ -138,8 +213,8 @@ services:
 ```bash
 git clone https://github.com/ranuts/document.git
 cd document
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### Running Tests

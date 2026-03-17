@@ -1,6 +1,6 @@
 import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
-import { handleDocumentOperation, initX2T, loadEditorApi, loadScript } from './converter';
+import { emitHostEvent } from './host-bridge';
 import { showLoading } from './loading';
 import { determineFilename } from './url-utils';
 import { formatErrorMessage } from './error-utils';
@@ -11,6 +11,18 @@ import { getFileInputAccept } from './file-picker';
 let hideControlPanelFn: (() => void) | null = null;
 let showControlPanelFn: (() => void) | null = null;
 let showMenuGuideFn: (() => void) | null = null;
+let converterModulePromise: Promise<typeof import('./converter')> | null = null;
+
+/**
+ * Lazily load the converter module so homepage startup can stay lightweight.
+ */
+async function getConverterModule(): Promise<typeof import('./converter')> {
+  if (!converterModulePromise) {
+    converterModulePromise = import('./converter');
+  }
+
+  return converterModulePromise;
+}
 
 export function setUICallbacks(callbacks: {
   hideControlPanel: () => void;
@@ -33,6 +45,7 @@ export const onCreateNew = async (ext: string): Promise<void> => {
   // Note: Loading is now shown in the menu button click handler
   // This function should not show loading again to avoid double loading indicators
   try {
+    const converter = await getConverterModule();
     // Always hide control panel and ensure FAB is visible when creating new document
     if (hideControlPanelFn) {
       hideControlPanelFn();
@@ -41,11 +54,11 @@ export const onCreateNew = async (ext: string): Promise<void> => {
       fileName: 'New_Document' + ext,
       file: undefined,
     });
-    await loadScript();
-    await loadEditorApi();
-    await initX2T();
+    await converter.loadScript();
+    await converter.loadEditorApi();
+    await converter.initX2T();
     const { fileName, file: fileBlob } = getDocmentObj();
-    await handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
+    await converter.handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
     // Show menu guide after document is loaded
     if (showMenuGuideFn) {
       setTimeout(() => {
@@ -54,6 +67,11 @@ export const onCreateNew = async (ext: string): Promise<void> => {
     }
   } catch (error) {
     console.error('Error creating new document:', error);
+    emitHostEvent('DOCUMENT_OPEN_FAILED', {
+      action: 'CREATE_NEW',
+      ext,
+      message: formatErrorMessage(error),
+    });
     // Ensure control panel is shown on error
     if (showControlPanelFn) {
       showControlPanelFn();
@@ -79,6 +97,7 @@ export const onOpenDocument = (): void => {
     if (file) {
       const { removeLoading } = showLoading();
       try {
+        const converter = await getConverterModule();
         if (hideControlPanelFn) {
           hideControlPanelFn();
         }
@@ -87,9 +106,9 @@ export const onOpenDocument = (): void => {
           file: file,
           url: await createObjectURL(file),
         });
-        await initX2T();
+        await converter.initX2T();
         const { fileName, file: fileBlob } = getDocmentObj();
-        await handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
+        await converter.handleDocumentOperation({ file: fileBlob, fileName, isNew: !fileBlob });
         // Clear file selection so the same file can be selected again
         fileInput.value = '';
         // Show menu guide after document is loaded
@@ -100,6 +119,11 @@ export const onOpenDocument = (): void => {
         }
       } catch (error) {
         console.error('Error opening document:', error);
+        emitHostEvent('DOCUMENT_OPEN_FAILED', {
+          action: 'OPEN_LOCAL_FILE',
+          fileName: file.name,
+          message: formatErrorMessage(error),
+        });
         // Ensure control panel is shown on error
         if (showControlPanelFn) {
           showControlPanelFn();
@@ -119,9 +143,17 @@ export const onOpenDocument = (): void => {
   fileInput.click();
 };
 
-export const openDocumentFromUrl = async (url: string, fileName?: string): Promise<void> => {
+/**
+ * Open a remote document URL inside the editor, optionally rethrowing failures to the caller.
+ */
+export const openDocumentFromUrl = async (
+  url: string,
+  fileName?: string,
+  options?: { rethrow?: boolean },
+): Promise<void> => {
   const { removeLoading } = showLoading();
   try {
+    const converter = await getConverterModule();
     if (hideControlPanelFn) {
       hideControlPanelFn();
     }
@@ -155,9 +187,9 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     });
 
     // Initialize and open document
-    await initX2T();
+    await converter.initX2T();
     const { fileName: docFileName, file: fileBlob } = getDocmentObj();
-    await handleDocumentOperation({ file: fileBlob, fileName: docFileName, isNew: !fileBlob });
+    await converter.handleDocumentOperation({ file: fileBlob, fileName: docFileName, isNew: !fileBlob });
 
     // Show menu guide after document is loaded
     if (showMenuGuideFn) {
@@ -167,9 +199,19 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     }
   } catch (error) {
     console.error('Error opening document from URL:', error);
-    alert(`Failed to open document: ${formatErrorMessage(error)}`);
+    const message = formatErrorMessage(error);
+    emitHostEvent('DOCUMENT_OPEN_FAILED', {
+      action: 'OPEN_DOCUMENT_URL',
+      url,
+      fileName,
+      message,
+    });
+    alert(`Failed to open document: ${message}`);
     if (showControlPanelFn) {
       showControlPanelFn();
+    }
+    if (options?.rethrow) {
+      throw error;
     }
   } finally {
     removeLoading();

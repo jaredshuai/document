@@ -10,7 +10,6 @@ import {
 } from './lib/ui';
 import { extractDocumentUrl, safeDecodeUri } from './lib/url-utils';
 import 'ranui/button';
-import '@khmyznikov/pwa-install';
 import './styles/base.css';
 
 declare global {
@@ -82,7 +81,11 @@ if ('serviceWorker' in navigator) {
 }
 
 // Initialize PWA install component
-const initPwaInstall = () => {
+/**
+ * Lazily load the PWA installer web component after the homepage has settled.
+ */
+const initPwaInstall = async () => {
+  await import('@khmyznikov/pwa-install');
   const pwaInstall = document.createElement('pwa-install');
   pwaInstall.id = 'pwa-install';
 
@@ -106,4 +109,6 @@ const initPwaInstall = () => {
 };
 
 // Start PWA initialization after short delay to ensure everything is settled
-setTimeout(initPwaInstall, 1000);
+setTimeout(() => {
+  void initPwaInstall();
+}, 1000);
