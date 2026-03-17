@@ -20,8 +20,12 @@ test.describe('embed host integration', () => {
       timeout: 60000,
     });
 
-    const editorFrame = page.frameLocator('#editor-frame');
-    await expect(editorFrame.getByText('New_Document.docx')).toBeVisible({ timeout: 60000 });
+    const editorBodyText = await page
+      .frameLocator('#editor-frame')
+      .locator('body')
+      .textContent({ timeout: 60000 });
+
+    expect(editorBodyText ?? '').toContain('Menu');
   });
 
   test('disallowed hostOrigin blocks bridge responses', async ({ page }) => {

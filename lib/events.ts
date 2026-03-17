@@ -148,6 +148,22 @@ export const events: Record<string, MessageHandler<any, unknown>> = {
   },
 };
 
+/**
+ * Post a bridge response back to the original message source.
+ */
+function postBridgeResponse(target: MessageEventSource | null, encodedData: string, origin: string): void {
+  if (!target) {
+    return;
+  }
+
+  if (target instanceof Window) {
+    target.postMessage(encodedData, origin);
+    return;
+  }
+
+  target.postMessage(encodedData);
+}
+
 export function initEvents(): void {
   initHostBridgeTracking();
   const initBridge = async (event: MessageEvent) => {
@@ -169,7 +185,7 @@ export function initEvents(): void {
     try {
       const result = await handler(payload);
       const encodedData = MessageCodec.encode({ type, payload: result, id, isResponse: true });
-      event.source?.postMessage(encodedData, event.origin);
+      postBridgeResponse(event.source, encodedData, event.origin);
     } catch (error) {
       const encodedData = MessageCodec.encode({
         type,
@@ -181,7 +197,7 @@ export function initEvents(): void {
         isResponse: true,
         isError: true,
       });
-      event.source?.postMessage(encodedData, event.origin);
+      postBridgeResponse(event.source, encodedData, event.origin);
     }
   };
 

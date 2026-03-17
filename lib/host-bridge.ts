@@ -103,7 +103,6 @@ export function emitHostEvent(event: string, data?: Record<string, unknown>): vo
     },
   });
 
-  const targetOrigin = hostMessageOrigin ?? window.location.origin;
   if (target instanceof Window) {
     const allowedOrigins = hostMessageOrigin ? [hostMessageOrigin] : getAllowedHostOrigins();
     for (const allowedOrigin of allowedOrigins) {
