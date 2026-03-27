@@ -15,7 +15,9 @@
     "format": "prettier --write .",
     "lint:ts": "oxlint && tsc --noEmit",
     "lint:docker": "docker compose -f docker-compose.yaml config --quiet",
-    "lint": "pnpm run lint:ts && pnpm run lint:docker"
+    "lint": "pnpm run lint:ts && pnpm run lint:docker",
+    "smoke": "playwright test",
+    "smoke:ui": "playwright test --ui"
   },
   "engines": {
     "node": ">=20.19.0"
@@ -48,6 +50,7 @@
     "url": "https://github.com/ranuts/document/issues"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.0.5",
     "@vitest/coverage-v8": "^4.0.18",
