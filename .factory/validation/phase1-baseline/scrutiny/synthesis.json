@@ -1,0 +1,50 @@
+{
+  "milestone": "phase1-baseline",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "pnpm test",
+      "exitCode": 0,
+      "details": "1399 tests passed in 28 test files (reduced from 2726 tests in 59 files)"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "pnpm exec tsc --noEmit",
+      "exitCode": 0
+    },
+    "lint": {
+      "passed": true,
+      "command": "pnpm exec oxlint && pnpm exec tsc --noEmit && docker compose -f docker-compose.yaml config --quiet",
+      "exitCode": 0,
+      "details": "1 oxlint warning (no-unused-expressions in bin/bundle_single_html.js:36), non-blocking"
+    },
+    "build": {
+      "passed": true,
+      "command": "pnpm build",
+      "exitCode": 0
+    },
+    "docker:build": {
+      "passed": true,
+      "command": "docker build -t ghcr.io/ranuts/document:test .",
+      "exitCode": 0
+    },
+    "docker:run": {
+      "passed": true,
+      "command": "docker run --rm -p 8080:80 ghcr.io/ranuts/document:test",
+      "details": "App serves HTTP 200 on port 8080"
+    }
+  },
+  "reviewsSummary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [],
+  "previousRound": null
+}
