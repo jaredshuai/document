@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.describe('CSV Smoke Tests', () => {
   const CSV_URL = 'https://raw.githubusercontent.com/sunn-e/awesome-dummy-sample-files/main/sample.csv';
 
-  test('opens remote CSV and editor initializes with #iframe present', async ({ page }) => {
+  test('opens remote CSV and editor initializes with iframe present', async ({ page }) => {
     // Navigate to the app with CSV URL as src parameter
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(CSV_URL)}`);
 
@@ -21,7 +21,11 @@ test.describe('CSV Smoke Tests', () => {
     });
 
     // Wait for the OnlyOffice editor iframe to appear
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    // The #iframe placeholder div gets replaced by an iframe when OnlyOffice initializes
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
 
     // Give the editor a moment to initialize
     await page.waitForTimeout(3000);
@@ -38,7 +42,10 @@ test.describe('CSV Smoke Tests', () => {
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(CSV_URL)}`);
 
     // Wait for editor to fully initialize
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
     await page.waitForTimeout(5000);
 
     // Set up download detection

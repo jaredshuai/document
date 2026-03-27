@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.describe('DOCX Smoke Tests', () => {
   const DOCX_URL = 'https://raw.githubusercontent.com/sunn-e/awesome-dummy-sample-files/main/sample.docx';
 
-  test('opens remote DOCX and editor initializes with #iframe present', async ({ page }) => {
+  test('opens remote DOCX and editor initializes with iframe present', async ({ page }) => {
     // Navigate to the app with DOCX URL as src parameter
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(DOCX_URL)}`);
 
@@ -21,8 +21,12 @@ test.describe('DOCX Smoke Tests', () => {
     });
 
     // Wait for the OnlyOffice editor iframe to appear
-    // The editor container should have an iframe element
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    // The #iframe placeholder div gets replaced by an iframe when OnlyOffice initializes
+    // Use waitForFunction to detect the DOM replacement (more reliable than visible iframe)
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
 
     // Give the editor a moment to initialize
     await page.waitForTimeout(3000);
@@ -40,7 +44,10 @@ test.describe('DOCX Smoke Tests', () => {
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(DOCX_URL)}`);
 
     // Wait for editor to fully initialize
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
     await page.waitForTimeout(5000); // Allow OnlyOffice to fully load
 
     // Set up download detection

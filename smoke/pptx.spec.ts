@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.describe('PPTX Smoke Tests', () => {
   const PPTX_URL = 'https://raw.githubusercontent.com/sunn-e/awesome-dummy-sample-files/main/sample.pptx';
 
-  test('opens remote PPTX and editor initializes with #iframe present', async ({ page }) => {
+  test('opens remote PPTX and editor initializes with iframe present', async ({ page }) => {
     // Navigate to the app with PPTX URL as src parameter
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(PPTX_URL)}`);
 
@@ -21,7 +21,11 @@ test.describe('PPTX Smoke Tests', () => {
     });
 
     // Wait for the OnlyOffice editor iframe to appear
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    // The #iframe placeholder div gets replaced by an iframe when OnlyOffice initializes
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
 
     // Give the editor a moment to initialize
     await page.waitForTimeout(3000);
@@ -38,7 +42,10 @@ test.describe('PPTX Smoke Tests', () => {
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(PPTX_URL)}`);
 
     // Wait for editor to fully initialize
-    await page.waitForSelector('#iframe', { timeout: 30000 });
+    await page.waitForFunction(
+      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
+      { timeout: 30000 }
+    );
     await page.waitForTimeout(5000);
 
     // Set up download detection
