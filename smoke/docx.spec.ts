@@ -48,8 +48,29 @@ test.describe('DOCX Smoke Tests', () => {
     // Set up download detection with increased timeout
     const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
 
-    // Use Ctrl+S as primary trigger for download
-    await page.keyboard.press('Control+s');
+    // Use OnlyOffice internal API to trigger save/download
+    // OnlyOffice doesn't respond to Ctrl+S in headless mode, so we call the internal save command directly
+    await page.evaluate(() => {
+      const iframe = document.querySelector('iframe');
+      if (iframe && iframe.contentWindow) {
+        const contentWindow = iframe.contentWindow as any;
+        // Try calling the internal save command on the DocsAPI DocEditor instance
+        if (contentWindow.DocsAPI?.DocEditor?.prototype?.asc_callSaveCommand) {
+          contentWindow.DocsAPI.DocEditor.prototype.asc_callSaveCommand();
+        } else if (contentWindow.asc_frames?.length > 0) {
+          // Alternative: access through asc_frames
+          const editorWindow = contentWindow.asc_frames[0];
+          if (editorWindow?.Asc?.scope) {
+            editorWindow.Asc.scope.asc_callSaveCommand();
+          }
+        }
+      }
+      // Also try calling on the window.editor if available
+      const w = window as any;
+      if (w.editor?.asc_callSaveCommand) {
+        w.editor.asc_callSaveCommand();
+      }
+    });
     await page.waitForTimeout(3000);
 
     // Wait for download to complete

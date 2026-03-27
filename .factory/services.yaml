@@ -1,0 +1,26 @@
+commands:
+  install: pnpm install --frozen-lockfile
+  typecheck: pnpm exec tsc --noEmit
+  lint: pnpm lint
+  lint:ts: pnpm exec oxlint && pnpm exec tsc --noEmit
+  lint:docker: docker compose -f docker-compose.yaml config --quiet
+  test: pnpm test
+  test:coverage: pnpm test:coverage
+  build: pnpm build
+  build:vite: pnpm exec vite build
+  dev: pnpm dev
+
+services:
+  docker:
+    start: docker build -t ghcr.io/ranuts/document:test .
+    stop: docker ps -q --filter "ancestor=ghcr.io/ranuts/document:test" | xargs -r docker stop
+    healthcheck: docker images ghcr.io/ranuts/document:test --format "{{.Repository}}"
+    port: 8080
+    depends_on: []
+
+  app:
+    start: docker run --rm -d --name document-test -p 8080:80 ghcr.io/ranuts/document:test
+    stop: docker stop document-test 2>/dev/null; docker rm document-test 2>/dev/null; true
+    healthcheck: curl -sf http://localhost:8080/ || exit 1
+    port: 8080
+    depends_on: [docker]
