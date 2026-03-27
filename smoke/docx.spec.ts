@@ -10,7 +10,7 @@ test.describe('DOCX Smoke Tests', () => {
 
   test('opens remote DOCX and editor initializes with #iframe present', async ({ page }) => {
     // Navigate to the app with DOCX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(DOCX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(DOCX_URL)}`);
 
     // Collect console errors
     const consoleErrors: string[] = [];
@@ -37,7 +37,7 @@ test.describe('DOCX Smoke Tests', () => {
 
   test('download produces DOCX file with non-zero size', async ({ page }) => {
     // Navigate to the app with DOCX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(DOCX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(DOCX_URL)}`);
 
     // Wait for editor to fully initialize
     await page.waitForSelector('#iframe', { timeout: 30000 });

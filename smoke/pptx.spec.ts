@@ -10,7 +10,7 @@ test.describe('PPTX Smoke Tests', () => {
 
   test('opens remote PPTX and editor initializes with #iframe present', async ({ page }) => {
     // Navigate to the app with PPTX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(PPTX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(PPTX_URL)}`);
 
     // Collect console errors
     const consoleErrors: string[] = [];
@@ -35,7 +35,7 @@ test.describe('PPTX Smoke Tests', () => {
 
   test('download produces PPTX file with non-zero size', async ({ page }) => {
     // Navigate to the app with PPTX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(PPTX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(PPTX_URL)}`);
 
     // Wait for editor to fully initialize
     await page.waitForSelector('#iframe', { timeout: 30000 });

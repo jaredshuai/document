@@ -10,7 +10,7 @@ test.describe('XLSX Smoke Tests', () => {
 
   test('opens remote XLSX and editor initializes with #iframe present', async ({ page }) => {
     // Navigate to the app with XLSX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(XLSX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(XLSX_URL)}`);
 
     // Collect console errors
     const consoleErrors: string[] = [];
@@ -35,7 +35,7 @@ test.describe('XLSX Smoke Tests', () => {
 
   test('download produces XLSX file with non-zero size', async ({ page }) => {
     // Navigate to the app with XLSX URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(XLSX_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(XLSX_URL)}`);
 
     // Wait for editor to fully initialize
     await page.waitForSelector('#iframe', { timeout: 30000 });

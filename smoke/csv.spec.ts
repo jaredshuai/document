@@ -10,7 +10,7 @@ test.describe('CSV Smoke Tests', () => {
 
   test('opens remote CSV and editor initializes with #iframe present', async ({ page }) => {
     // Navigate to the app with CSV URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(CSV_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(CSV_URL)}`);
 
     // Collect console errors
     const consoleErrors: string[] = [];
@@ -35,7 +35,7 @@ test.describe('CSV Smoke Tests', () => {
 
   test('download produces CSV file with non-zero size', async ({ page }) => {
     // Navigate to the app with CSV URL as src parameter
-    await page.goto(`/?src=${encodeURIComponent(CSV_URL)}`);
+    await page.goto(`http://localhost:8080/?src=${encodeURIComponent(CSV_URL)}`);
 
     // Wait for editor to fully initialize
     await page.waitForSelector('#iframe', { timeout: 30000 });
