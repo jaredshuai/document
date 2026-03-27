@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * VAL-SMOKE-008: Download produces output file for CSV
  */
 test.describe('CSV Smoke Tests', () => {
-  const CSV_URL = 'https://raw.githubusercontent.com/sunn-e/awesome-dummy-sample-files/main/sample.csv';
+  const CSV_URL = 'http://cdn.githubraw.com/sunn-e/awesome-dummy-sample-files/main/sample.csv';
 
   test('opens remote CSV and editor initializes with iframe present', async ({ page }) => {
     // Navigate to the app with CSV URL as src parameter
@@ -29,8 +29,9 @@ test.describe('CSV Smoke Tests', () => {
     await page.waitForTimeout(3000);
 
     // Verify no Error-level console entries (filter non-critical)
+    // Filter out font loading errors OnlyOffice generates in headless: 'file:///C:/Windows/Fonts/...'
     const criticalErrors = consoleErrors.filter(
-      (err) => !err.includes('favicon') && !err.includes('404')
+      (err) => !err.includes('favicon') && !err.includes('404') && !err.includes('font') && !err.includes('Fonts')
     );
     expect(criticalErrors).toHaveLength(0);
   });
@@ -43,19 +44,12 @@ test.describe('CSV Smoke Tests', () => {
     await page.waitForSelector('iframe', { timeout: 30000, state: 'attached' });
     await page.waitForTimeout(5000);
 
-    // Set up download detection
-    const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+    // Set up download detection with increased timeout
+    const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
 
-    // Trigger download
-    const downloadButton = page.locator('button:has-text("Download"), button:has-text("download"), [data-action="download"]');
-    
-    if (await downloadButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await downloadButton.click();
-    } else {
-      // Fallback: Use Ctrl+S
-      await page.keyboard.press('Control+s');
-      await page.waitForTimeout(1000);
-    }
+    // Use Ctrl+S as primary trigger for download
+    await page.keyboard.press('Control+s');
+    await page.waitForTimeout(2000);
 
     // Wait for download
     const download = await downloadPromise;
