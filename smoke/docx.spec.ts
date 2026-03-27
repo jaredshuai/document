@@ -22,11 +22,8 @@ test.describe('DOCX Smoke Tests', () => {
 
     // Wait for the OnlyOffice editor iframe to appear
     // The #iframe placeholder div gets replaced by an iframe when OnlyOffice initializes
-    // Use waitForFunction to detect the DOM replacement (more reliable than visible iframe)
-    await page.waitForFunction(
-      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
-      { timeout: 30000 }
-    );
+    // Use waitForSelector('iframe') to detect the actual OnlyOffice iframe (not the placeholder div)
+    await page.waitForSelector('iframe', { timeout: 30000, state: 'attached' });
 
     // Give the editor a moment to initialize
     await page.waitForTimeout(3000);
@@ -43,11 +40,8 @@ test.describe('DOCX Smoke Tests', () => {
     // Navigate to the app with DOCX URL as src parameter
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(DOCX_URL)}`);
 
-    // Wait for editor to fully initialize
-    await page.waitForFunction(
-      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
-      { timeout: 30000 }
-    );
+    // Wait for the OnlyOffice editor iframe to appear
+    await page.waitForSelector('iframe', { timeout: 30000, state: 'attached' });
     await page.waitForTimeout(5000); // Allow OnlyOffice to fully load
 
     // Set up download detection

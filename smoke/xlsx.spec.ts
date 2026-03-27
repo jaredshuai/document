@@ -21,11 +21,9 @@ test.describe('XLSX Smoke Tests', () => {
     });
 
     // Wait for the OnlyOffice editor iframe to appear
-    // The #iframe placeholder div gets replaced by an iframe when OnlyOffice initializes
-    await page.waitForFunction(
-      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
-      { timeout: 30000 }
-    );
+    // Use waitForSelector('iframe') to detect the actual OnlyOffice iframe (not the placeholder div)
+    // Use state: 'attached' because the iframe may not be immediately visible
+    await page.waitForSelector('iframe', { timeout: 30000, state: 'attached' });
 
     // Give the editor a moment to initialize
     await page.waitForTimeout(3000);
@@ -41,11 +39,8 @@ test.describe('XLSX Smoke Tests', () => {
     // Navigate to the app with XLSX URL as src parameter
     await page.goto(`http://localhost:8080/?src=${encodeURIComponent(XLSX_URL)}`);
 
-    // Wait for editor to fully initialize
-    await page.waitForFunction(
-      () => document.querySelector('#iframe')?.querySelector('iframe') !== null,
-      { timeout: 30000 }
-    );
+    // Wait for the OnlyOffice editor iframe to appear
+    await page.waitForSelector('iframe', { timeout: 30000, state: 'attached' });
     await page.waitForTimeout(5000);
 
     // Set up download detection
