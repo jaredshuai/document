@@ -7,6 +7,8 @@ export interface I18nMessages {
   // UI text
   webOffice: string;
   uploadDocument: string;
+  returnHome: string;
+  close: string;
   newWord: string;
   newExcel: string;
   newPowerPoint: string;
@@ -31,11 +33,13 @@ export const i18nMessages: Record<Language, I18nMessages> = {
   [LanguageCode.ZH]: {
     webOffice: 'Web Office',
     uploadDocument: '查看/编辑文档',
+    returnHome: '返回首页',
+    close: '关闭',
     newWord: '新建 Word',
     newExcel: '新建 Excel',
     newPowerPoint: '新建 PowerPoint',
     menu: '菜单',
-    menuGuide: '菜单在右下角，悬停即可查看（点击关闭后不再提示）',
+    menuGuide: '关闭按钮在右上角，点击即可退出编辑（关闭后不再提示）',
     fileSavedSuccess: '文件保存成功：',
     documentLoaded: '文档加载完成：',
     failedToLoadEditor: '无法加载编辑器组件。请确保已正确安装 OnlyOffice API。',
@@ -46,11 +50,13 @@ export const i18nMessages: Record<Language, I18nMessages> = {
   [LanguageCode.EN]: {
     webOffice: 'Web Office',
     uploadDocument: 'View/Edit Document',
+    returnHome: 'Back to Home',
+    close: 'Close',
     newWord: 'New Word',
     newExcel: 'New Excel',
     newPowerPoint: 'New PowerPoint',
     menu: 'Menu',
-    menuGuide: "Menu is in the bottom right corner, hover to view (click to close, won't show again)",
+    menuGuide: "The close button is in the top right corner. Click it to exit editing (dismissed after closing).",
     fileSavedSuccess: 'File saved successfully: ',
     documentLoaded: 'Document loaded: ',
     failedToLoadEditor: 'Failed to load editor component. Please ensure OnlyOffice API is properly installed.',
@@ -67,6 +73,8 @@ export function getMessageKeys(): (keyof I18nMessages)[] {
   return [
     'webOffice',
     'uploadDocument',
+    'returnHome',
+    'close',
     'newWord',
     'newExcel',
     'newPowerPoint',

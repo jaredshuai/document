@@ -561,6 +561,10 @@ describe('extractFileType', () => {
     expect(extractFileType('application/vnd.ms-excel', 'presentation.pptx')).toBe('xls');
   });
 
+  it('should prefer explicit csv filename over excel mime type', () => {
+    expect(extractFileType('application/vnd.ms-excel', 'sample.csv')).toBe('csv');
+  });
+
   it('should handle case-insensitive MIME types', () => {
     expect(extractFileType('APPLICATION/MSWORD')).toBe('doc');
     expect(extractFileType('Application/Vnd.Ms-Excel')).toBe('xls');

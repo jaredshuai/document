@@ -241,3 +241,38 @@ r-button[type='text']::part(ran-btn-content) {
   flex-shrink: 0;
   transform: scale(1);
 }
+
+.close-editor-button {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1003;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  font-family: "Segoe UI Symbol", "Segoe UI", Arial, sans-serif;
+  font-weight: 400;
+  line-height: 1;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.close-editor-button:hover {
+  background: #e81123;
+  color: #fff;
+}
+
+.close-editor-button:active {
+  background: #c50f1f;
+  color: #fff;
+}

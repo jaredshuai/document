@@ -1,9 +1,9 @@
-import { createObjectURL, getExtensions, scriptOnLoad } from 'ranuts/utils';
+import { createObjectURL, scriptOnLoad } from 'ranuts/utils';
 import 'ranui/message';
 import { t } from './i18n';
 import type { BinConversionResult, ConversionResult, DocumentType, EmscriptenModule } from './document-types';
 import { BASE_PATH, getDocumentType } from './document-utils';
-import { sanitizeFileName } from './url-utils';
+import { extractFileType, sanitizeFileName } from './url-utils';
 import { createConversionParams } from './conversion-utils';
 import { hasUtf8Bom, decodeBytes, concatBytes, UTF8_BOM, encodeToBytes } from './byte-utils';
 import { createSavePickerOptions } from './file-picker';
@@ -15,11 +15,14 @@ import {
   createOutputFileName,
 } from './conversion-paths';
 
+type XlsxModule = typeof import('xlsx');
+
 export class X2TConverter {
   private x2tModule: EmscriptenModule | null = null;
   private isReady = false;
   private initPromise: Promise<EmscriptenModule> | null = null;
   private hasScriptLoaded = false;
+  private xlsxModulePromise: Promise<XlsxModule> | null = null;
 
   private readonly SCRIPT_PATH = `${BASE_PATH}wasm/x2t/x2t.js`;
   private readonly INIT_TIMEOUT = 300000;
@@ -180,29 +183,17 @@ export class X2TConverter {
   }
 
   /**
-   * Load xlsx library from local file
+   * Load the npm xlsx module.
+   *
+   * The previously vendored browser build produced XLSX files that opened
+   * inconsistently after CSV conversion. Using the same npm package output
+   * in both Node and browser paths gives us deterministic workbooks.
    */
-  private async loadXlsxLibrary(): Promise<any> {
-    // Check if xlsx is already loaded
-    if (typeof window !== 'undefined' && (window as any).XLSX) {
-      return (window as any).XLSX;
+  private async loadXlsxLibrary(): Promise<XlsxModule> {
+    if (!this.xlsxModulePromise) {
+      this.xlsxModulePromise = import('xlsx');
     }
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `${BASE_PATH}libs/sheetjs/xlsx.full.min.js`;
-      script.onload = () => {
-        if (typeof window !== 'undefined' && (window as any).XLSX) {
-          resolve((window as any).XLSX);
-        } else {
-          reject(new Error('Failed to load xlsx library'));
-        }
-      };
-      script.onerror = () => {
-        reject(new Error('Failed to load xlsx library from local file'));
-      };
-      document.head.appendChild(script);
-    });
+    return this.xlsxModulePromise;
   }
 
   /**
@@ -217,11 +208,23 @@ export class X2TConverter {
       // Decode CSV data, handling UTF-8 BOM if present
       const csvText = decodeBytes(csvData);
 
-      // Parse CSV using SheetJS
-      const workbook = XLSX.read(csvText, { type: 'string', raw: false });
+      // Build the workbook explicitly instead of round-tripping through
+      // SheetJS CSV auto-detection. This yields a more predictable XLSX
+      // structure for x2t/OnlyOffice consumption.
+      const rows = csvText
+        .split(/\r?\n/)
+        .filter((line) => line.length > 0)
+        .map((line) => line.split(','));
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
       // Convert to XLSX binary format
-      const xlsxBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+      const xlsxBuffer = XLSX.write(workbook, {
+        type: 'array',
+        bookType: 'xlsx',
+        bookSST: true,
+      });
 
       // Create File object
       const xlsxFileName = fileName.replace(/\.csv$/i, '.xlsx');
@@ -243,7 +246,7 @@ export class X2TConverter {
     await this.initialize();
 
     const fileName = file.name;
-    const fileExt = getExtensions(file?.type)[0] || fileName.split('.').pop() || '';
+    const fileExt = extractFileType(file?.type, fileName);
     const documentType = getDocumentType(fileExt);
     if (!documentType) {
       throw new Error(`Unsupported file format: ${fileExt}`);

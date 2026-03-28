@@ -34,6 +34,8 @@ describe('getMessageKeys', () => {
     const keys = getMessageKeys();
     expect(keys).toContain('webOffice');
     expect(keys).toContain('uploadDocument');
+    expect(keys).toContain('returnHome');
+    expect(keys).toContain('close');
     expect(keys).toContain('newWord');
     expect(keys).toContain('newExcel');
     expect(keys).toContain('newPowerPoint');
@@ -47,8 +49,8 @@ describe('getMessageKeys', () => {
     expect(keys).toContain('documentOperationFailed');
   });
 
-  it('should return 13 keys', () => {
-    expect(getMessageKeys()).toHaveLength(13);
+  it('should return 15 keys', () => {
+    expect(getMessageKeys()).toHaveLength(15);
   });
 });
 

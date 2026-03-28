@@ -1,6 +1,7 @@
 import { createObjectURL } from 'ranuts/utils';
 import { getDocmentObj, setDocmentObj } from '../store';
 import { handleDocumentOperation, initX2T, loadEditorApi, loadScript } from './converter';
+import { getEditorCleanupDelay } from './editor-utils';
 import { showLoading } from './loading';
 import { determineFilename } from './url-utils';
 import { formatErrorMessage } from './error-utils';
@@ -173,5 +174,45 @@ export const openDocumentFromUrl = async (url: string, fileName?: string): Promi
     }
   } finally {
     removeLoading();
+  }
+};
+
+export const returnToHome = async (): Promise<void> => {
+  try {
+    if (window.editor && typeof window.editor.destroyEditor === 'function') {
+      const currentFileName = getDocmentObj().fileName;
+      const fileType = currentFileName.split('.').pop()?.toLowerCase() || '';
+      const cleanupDelay = getEditorCleanupDelay(fileType, true);
+      window.editor.destroyEditor();
+      window.editor = undefined;
+      await new Promise((resolve) => setTimeout(resolve, cleanupDelay));
+    }
+
+    const iframeContainer = document.getElementById('iframe');
+    if (iframeContainer) {
+      while (iframeContainer.firstChild) {
+        iframeContainer.removeChild(iframeContainer.firstChild);
+      }
+    }
+
+    setDocmentObj({
+      fileName: '',
+      file: undefined,
+      url: undefined,
+    });
+    fileInput.value = '';
+
+    // Remove auto-open URL params so returning home does not immediately re-open the document.
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('file');
+    nextUrl.searchParams.delete('src');
+    window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+
+    if (showControlPanelFn) {
+      showControlPanelFn();
+    }
+  } catch (error) {
+    console.error('Error returning to home:', error);
+    throw error;
   }
 };

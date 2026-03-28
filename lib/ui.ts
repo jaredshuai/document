@@ -1,16 +1,20 @@
 import { localStorageGetItem, localStorageSetItem } from 'ranuts/utils';
 import { t } from './i18n';
 import { showLoading } from './loading';
-import { onCreateNew, onOpenDocument } from './document';
+import { onCreateNew, onOpenDocument, returnToHome } from './document';
 
 // Hide control panel and show top floating bar
 export const hideControlPanel = (): void => {
   const container = document.querySelector('#control-panel-container') as HTMLElement;
   const fabContainer = document.querySelector('#fab-container') as HTMLElement;
+  const closeButton = document.querySelector('#close-editor-button') as HTMLElement;
 
   // Always ensure FAB is visible when hiding control panel
   if (fabContainer) {
     fabContainer.style.display = 'block';
+  }
+  if (closeButton) {
+    closeButton.style.display = 'flex';
   }
 
   if (container) {
@@ -28,17 +32,42 @@ export const hideControlPanel = (): void => {
 export const showControlPanel = (): void => {
   const container = document.querySelector('#control-panel-container') as HTMLElement;
   const fabContainer = document.querySelector('#fab-container') as HTMLElement;
+  const closeButton = document.querySelector('#close-editor-button') as HTMLElement;
   if (container) {
     container.style.display = 'flex';
     setTimeout(() => {
       container.style.opacity = '1';
     }, 10);
   }
+  if (closeButton) {
+    closeButton.style.display = 'none';
+  }
   // Only hide FAB if editor is not open
   // If editor is already open, keep FAB visible so user can access menu
   if (fabContainer && !window.editor) {
     fabContainer.style.display = 'none';
   }
+};
+
+export const createCloseButton = (): HTMLElement => {
+  const closeButton = document.createElement('button');
+  closeButton.id = 'close-editor-button';
+  closeButton.setAttribute('aria-label', t('close'));
+  closeButton.title = t('close');
+  closeButton.innerHTML = '&times;';
+  closeButton.className = 'close-editor-button';
+  closeButton.style.display = 'none';
+
+  closeButton.addEventListener('click', async () => {
+    try {
+      await returnToHome();
+    } catch (error) {
+      console.error('Error closing editor:', error);
+    }
+  });
+
+  document.body.appendChild(closeButton);
+  return closeButton;
 };
 
 // Create fixed action button in bottom right corner
@@ -113,6 +142,11 @@ export const createFixedActionButton = (): HTMLElement => {
       },
       false, // Don't show loading immediately - wait for file selection
     ),
+  );
+  menuPanel.appendChild(
+    createMenuButton(t('returnHome'), async () => {
+      await returnToHome();
+    }, false),
   );
   menuPanel.appendChild(
     createMenuButton(t('newWord'), async () => {

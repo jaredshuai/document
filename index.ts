@@ -3,6 +3,7 @@ import { initEvents, setEventUICallbacks } from './lib/events';
 import { onCreateNew, openDocumentFromUrl, setUICallbacks } from './lib/document';
 import {
   createControlPanel,
+  createCloseButton,
   createFixedActionButton,
   hideControlPanel,
   showControlPanel,
@@ -49,6 +50,7 @@ window.showControlPanel = showControlPanel;
 
 // Initialize UI components
 createFixedActionButton();
+createCloseButton();
 createControlPanel();
 
 // Check for file or src parameter in URL

@@ -178,6 +178,16 @@ const MIME_TO_EXTENSION: Record<string, string> = {
  * @returns The file extension (without dot) or empty string if not found
  */
 export function extractFileType(mimeType?: string, fileName?: string): string {
+  // CSV files are commonly served with Excel MIME types by generic static servers.
+  // Preserve the explicit filename extension in that case so CSV-specific
+  // conversion and save logic still runs.
+  if (fileName) {
+    const nameExt = getFileExtension(fileName);
+    if (nameExt === 'csv') {
+      return 'csv';
+    }
+  }
+
   // Try to get extension from MIME type first
   if (mimeType) {
     const ext = MIME_TO_EXTENSION[mimeType.toLowerCase()];

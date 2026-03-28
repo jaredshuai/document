@@ -1,8 +1,8 @@
 # Release Readiness Report
 
-## Verdict: ALMOST READY
+## Verdict: READY FOR INTERNAL STABLE RELEASE
 
-**Status:** 20/24 assertions pass. Editor initialization smoke tests pass for all file types (DOCX, XLSX, PPTX, CSV). Download tests are blocked by OnlyOffice SDK limitation in headless browser environments - this requires manual verification in a real browser.
+**Status:** Engineering baseline passes, editor initialization passes for all target formats (DOCX, XLSX, PPTX, CSV), and the CSV remote-open regression has been fixed. Download-flow automation remains blocked by OnlyOffice SDK behavior in browser automation, and the remaining manual verification step has been explicitly waived by the release owner for this internal stable release.
 
 ---
 
@@ -12,7 +12,7 @@
 |----------|--------|---------|
 | Engineering Baseline | ✅ PASSED | Build, lint, test, Docker all work |
 | Editor Initialization | ✅ PASSED | DOCX/XLSX/PPTX/CSV all open correctly |
-| Download Workflow | ⚠️ MANUAL VERIFICATION | OnlyOffice SDK limitation in headless mode |
+| Download Workflow | ⚠️ ACCEPTED RISK | Browser automation cannot reliably capture the final download action; release owner waived manual verification for this internal release |
 | Integration Contract | ✅ PASSED | INTEGRATION.md documents all requirements |
 
 ---
@@ -27,24 +27,24 @@
 - **SMOKE (Editor Init)** (4/4): VAL-SMOKE-001 through VAL-SMOKE-004 ✅
 - **RELEASE** (3/4): VAL-RELEASE-001, VAL-RELEASE-003, VAL-RELEASE-004 ✅
 
-### Blocked Assertions (4/24)
+### Waived Assertions (4/24)
 - **SMOKE (Download)** (0/4): VAL-SMOKE-005 through VAL-SMOKE-008 ❌
   - **Reason:** OnlyOffice SDK cannot trigger download events in headless browser environments
-  - **Mitigation:** Manual verification required in real browser
+  - **Disposition:** Release owner waived manual verification for this internal stable release
 
 ---
 
-## Manual Verification Required
+## Release Decision
 
-Before internal release, manually verify the download workflow:
+The remaining real-browser download verification has been **explicitly waived by the release owner** for this version.
 
-1. **Open the app** at `http://localhost:8080` (or deployed URL)
-2. **Test each file type:**
-   - Open a remote DOCX via `?src=<URL>` → make edit → download
-   - Open a remote XLSX via `?src=<URL>` → make edit → download
-   - Open a remote PPTX via `?src=<URL>` → make edit → download
-   - Open a remote CSV via `?src=<URL>` → make edit → download
-3. **Verify downloaded files** open correctly in their respective applications
+That means this release is acceptable for:
+
+1. **Internal use**
+2. **Preview/edit/download workflows where a small amount of manual operator judgment is acceptable**
+3. **Integration into docman as an internal stable dependency**
+
+It is **not** the same as a fully exhaustively verified public GA release.
 
 ---
 
@@ -56,16 +56,17 @@ Before internal release, manually verify the download workflow:
 |---------|--------|----------|
 | Cross-platform build (`bin/build.js`) | ✅ Complete | `pnpm build` succeeds on Windows and Linux |
 | Test suite classification | ✅ Complete | `TEST-CLASSIFICATION.md` created (21 Tier-1, 7 Tier-2, 31 Tier-3) |
-| Synthetic test consolidation | ✅ Complete | 59 files → 28 files (1399 tests, all passing) |
+| Synthetic test consolidation | ✅ Complete | 59 files → 28 files (1400 tests, all passing) |
+| CSV remote-open fix | ✅ Complete | CSV now preserves the `.csv` extension even when served with Excel MIME types |
 | Linux CI baseline | ✅ Complete | `pnpm lint`, `pnpm test`, `pnpm build` all pass |
 | Docker build/run | ✅ Complete | Image builds, serves on port 8080 |
 
-### Phase 2: Smoke Validation ✅ PASSED (with documented limitation)
+### Phase 2: Smoke Validation ✅ PASSED (with accepted risk)
 
 | Feature | Status | Evidence |
 |---------|--------|----------|
 | Editor initialization tests | ✅ Passed | DOCX/XLSX/PPTX/CSV all open and render |
-| Download tests | ⚠️ Manual verification | OnlyOffice SDK headless limitation |
+| Download tests | ⚠️ Accepted risk | Automation limitation accepted for this internal release |
 | Integration contract | ✅ Complete | `INTEGRATION.md` documents URL format, auth, CORS, etc. |
 
 ---
@@ -73,18 +74,18 @@ Before internal release, manually verify the download workflow:
 ## Release Checklist
 
 - [x] Cross-platform build works (Windows + Linux)
-- [x] Test suite stable (1399 tests pass)
+- [x] Test suite stable (1400 tests pass)
 - [x] Lint passes
 - [x] Docker build and run work
 - [x] Editor initialization smoke tests pass
-- [ ] **Manual verification:** Download workflow for DOCX/XLSX/PPTX/CSV
+- [x] **Release-owner waiver:** Download workflow manual verification intentionally skipped for this internal release
 - [x] Integration contract documented (INTEGRATION.md)
 
 ---
 
 ## Known Limitations
 
-1. **Download in headless CI:** OnlyOffice SDK cannot trigger browser downloads in headless mode. This is an SDK limitation, not a code bug. Automated download tests are disabled; manual verification required.
+1. **Download in headless CI:** OnlyOffice SDK cannot trigger browser downloads in headless mode. This is an SDK limitation, not a code bug. Automated download tests are still not reliable.
 2. **No save-back:** The viewer does not save documents back to any server. Users must download edited files manually.
 3. **No collaborative editing:** Single-user only.
 4. **No permissions system inside viewer:** Anyone with the URL can view/edit.
@@ -97,7 +98,7 @@ Before internal release, manually verify the download workflow:
 # Engineering baseline (all pass)
 pnpm install
 pnpm lint
-pnpm test          # 1399 tests pass
+pnpm test          # 1400 tests pass
 pnpm build         # produces dist/
 
 # Docker validation
@@ -109,7 +110,7 @@ curl http://localhost:8080/   # returns HTML with "Document Editor"
 docker compose up -d
 pnpm smoke         # or: pnpm exec playwright test smoke/
 
-# Manual verification: open in real browser
+# Real-browser spot check (optional, recommended but waived for this internal release)
 # http://localhost:8080/?src=https://example.com/sample.docx
 # Make edit → Download → Verify file
 ```
